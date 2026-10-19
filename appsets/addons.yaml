@@ -36,33 +36,33 @@ spec:
                       - path: "environments/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/{{.metadata.labels.region}}/versions.yaml"
           - list:
               elements:
-                - name: external-secrets
+                - addon: external-secrets
                   namespace: external-secrets
                   repoURL: https://charts.external-secrets.io
                   chart: external-secrets
                   wave: "-5"
-                - name: cert-manager
+                - addon: cert-manager
                   namespace: cert-manager
                   repoURL: https://charts.jetstack.io
                   chart: cert-manager
                   wave: "-5"
-                - name: ingress-nginx
+                - addon: ingress-nginx
                   namespace: ingress-nginx
                   repoURL: https://kubernetes.github.io/ingress-nginx
                   chart: ingress-nginx
                   wave: "-4"
-                - name: argo-rollouts
+                - addon: argo-rollouts
                   namespace: argo-rollouts
                   repoURL: https://argoproj.github.io/argo-helm
                   chart: argo-rollouts
                   wave: "-4"
   template:
     metadata:
-      name: "addon-{{.name}}-{{.nameNormalized}}"
+      name: "addon-{{.addon}}-{{.nameNormalized}}"
       annotations:
         argocd.argoproj.io/sync-wave: "{{.wave}}"
       labels:
-        addon: "{{.name}}"
+        addon: "{{.addon}}"
         environment: "{{.metadata.labels.environment}}"
       finalizers:
         - resources-finalizer.argocd.argoproj.io
@@ -72,14 +72,14 @@ spec:
         - repoURL: "{{.repoURL}}"
           chart: "{{.chart}}"
           # Version resolved per add-on from environments/<env>/versions.yaml.
-          targetRevision: "{{ index .addons .name }}"
+          targetRevision: "{{ index .addons .addon }}"
           helm:
-            releaseName: "{{.name}}"
+            releaseName: "{{.addon}}"
             valueFiles:
-              - $values/addons/{{.name}}/values-common.yaml
-              - $values/addons/{{.name}}/values-{{.metadata.labels.environment}}.yaml
+              - $values/addons/{{.addon}}/values-common.yaml
+              - $values/addons/{{.addon}}/values-{{.metadata.labels.environment}}.yaml
               # Per-region/per-cluster overlay (e.g. multi-region prod workload-identity ids).
-              - $values/addons/{{.name}}/values-{{.metadata.labels.environment}}-{{.metadata.labels.region}}.yaml
+              - $values/addons/{{.addon}}/values-{{.metadata.labels.environment}}-{{.metadata.labels.region}}.yaml
             ignoreMissingValueFiles: true
         - repoURL: https://github.com/krupakar-hyland/platform-gitops
           targetRevision: main
