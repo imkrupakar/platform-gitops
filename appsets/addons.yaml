@@ -1,7 +1,7 @@
 # Platform add-ons delivered to THIS cluster.
 # Generators: (cluster generator x per-CLUSTER versions file) x add-on list.
 #   - clusters: the local, labeled in-cluster secret (its `environment` label picks the env).
-#   - git files: environments/<env>/<cloud>/<region>/versions.yaml, selected by the
+#   - git files: envs/<env>/<cloud>/<region>/versions.yaml, selected by the
 #     cluster's environment/cloud/region labels (matrix passes the first generator's output
 #     into the second's templated path). Promotion is therefore per cloud and per region.
 #     pathParamPrefix avoids `.path` collisions with other git generators downstream.
@@ -33,7 +33,7 @@ spec:
                     revision: main
                     pathParamPrefix: ver
                     files:
-                      - path: "environments/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/{{.metadata.labels.region}}/versions.yaml"
+                      - path: "envs/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/{{.metadata.labels.region}}/versions.yaml"
           - list:
               elements:
                 - addon: external-secrets
@@ -71,7 +71,7 @@ spec:
       sources:
         - repoURL: "{{.repoURL}}"
           chart: "{{.chart}}"
-          # Version resolved per add-on from environments/<env>/versions.yaml.
+          # Version resolved per add-on from envs/<env>/versions.yaml.
           targetRevision: "{{ index .addons .addon }}"
           helm:
             releaseName: "{{.addon}}"

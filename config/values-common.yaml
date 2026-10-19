@@ -1,0 +1,9 @@
+# Common values for the platform-config chart (applied on EVERY cluster). Layered first, then
+# config/values-<env>.yaml and config/values-<env>-<region>.yaml (later wins). The chart's own
+# defaults already enable the gateway and the secretstore-guard (Deny); keep cross-env settings here.
+istioGateway:
+  enabled: true
+  namespace: istio-ingress
+secretstoreGuard:
+  enabled: true
+  serviceAccountName: eso-reader

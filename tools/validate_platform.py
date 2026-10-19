@@ -2,7 +2,7 @@
 """Validate platform-gitops consistency before a change can merge (every cluster pulls `main`).
 
 Checks
-  1. fleet.yaml <-> environments/<env>/<cloud>/<region>/versions.yaml, both directions; labels match
+  1. fleet.yaml <-> envs/<env>/<cloud>/<region>/versions.yaml, both directions; labels match
      the path; `addons` keys equal the add-on list in appsets/addons.yaml; no `goldenChart` (team-owned)
   2. every tenant (and _template) has controlplane/{appset,config-appset,project}.yaml and namespace/
      (the SecretStore is team-owned: <team>-gitops/config/envs/<env>/<cloud>/<region>/)
@@ -89,7 +89,7 @@ def main():
         addon_names = set()
         err(f"appsets/addons.yaml: cannot read the add-on list ({e})")
     found = set()
-    for p in glob.glob(os.path.join(PLATFORM, "environments", "*", "*", "*", "versions.yaml")):
+    for p in glob.glob(os.path.join(PLATFORM, "envs", "*", "*", "*", "versions.yaml")):
         parts = p.split(os.sep)
         key = (parts[-4], parts[-3], parts[-2])
         found.add(key)
@@ -113,8 +113,11 @@ def main():
         for k, val in pins.items():
             if not isinstance(val, str) or not val:
                 err(f"{rel}: addons.{k} must be a non-empty quoted version string")
+        pc = v.get("platformConfig")
+        if not isinstance(pc, str) or not pc:
+            err(f"{rel}: platformConfig must be a non-empty quoted version string (the platform-config chart pin)")
     for key in sorted(fleet_keys - found):
-        err(f"environments/{'/'.join(key)}/versions.yaml missing: that cluster would render no add-ons")
+        err(f"envs/{'/'.join(key)}/versions.yaml missing: that cluster would render no add-ons")
 
     # ---- 2. tenants
     tenants = sorted(d for d in glob.glob(os.path.join(PLATFORM, "tenants", "*")) if os.path.isdir(d))

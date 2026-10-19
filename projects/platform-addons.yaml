@@ -12,6 +12,7 @@ spec:
   description: Platform add-ons managed by Platform Engineering
   sourceRepos:
     - https://github.com/krupakar-hyland/platform-gitops
+    - ghcr.io/krupakar-hyland/charts # platform-config OCI chart registry
     - https://charts.external-secrets.io
     - https://istio-release.storage.googleapis.com/charts
     - https://argoproj.github.io/argo-helm

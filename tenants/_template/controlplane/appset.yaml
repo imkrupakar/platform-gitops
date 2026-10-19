@@ -3,7 +3,7 @@
 # The golden chart VERSION is team-owned: the team sets `goldenChart` in its own cluster
 # LEAF file (apps/<svc>/envs/<env>/<cloud>/<region>/values.yaml), at the team's own pace.
 # Add-on versions (ESO, cert-manager, ...) are unrelated to this appset — they're read from
-# environments/<env>/<cloud>/<region>/versions.yaml by the separate platform-addons appset.
+# envs/<env>/<cloud>/<region>/versions.yaml by the separate platform-addons appset.
 #
 # A service is deployed to a cluster only when its CLUSTER LEAF exists in the team repo:
 #   apps/<svc>/envs/<env>/<cloud>/<region>/values.yaml     (holds the image pin + goldenChart pin)

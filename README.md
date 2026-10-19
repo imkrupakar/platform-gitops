@@ -26,7 +26,7 @@ platform-gitops/
 │                                   # NB: argocd-cmd-params-cm is owned by the Helm install
 │                                   # (startup params need a controlled pod restart).
 │
-├── environments/                   # per-CLUSTER pinned ADD-ON versions (the golden chart is pinned by teams, in their leaves)
+├── envs/                           # per-CLUSTER pinned platform versions: ADD-ONS + platformConfig (the golden chart is pinned by teams, in their leaves)
 │   └── <env>/<cloud>/<region>/versions.yaml
 │                                   # promote per cloud/region: sbx → dev → stg → prd, one
 │                                   # cluster at a time (editing one never touches another)
@@ -48,9 +48,13 @@ platform-gitops/
 │   └── tenants-namespace.yaml      # (cluster × git tenants/*) → per-tenant ns/quota/netpol
 │                                   #   (the ESO SecretStore is team-owned; see tenants/_template/README.md)
 │
-├── config/                         # platform config applied on every cluster
-│   ├── cluster-issuers/            # cert-manager ClusterIssuers (letsencrypt-staging / -prod) used by ingress.clusterIssuer
-│   └── secretstore-guard/          # ValidatingAdmissionPolicy: tenant SecretStores must use eso-reader + workload identity/IRSA
+├── config/                         # VALUES for the platform-config chart (per-env overlays)
+│   ├── values-common.yaml          # applied on every cluster (gateway + secretstore-guard enabled)
+│   └── values-<env>.yaml           # per-env overlay (e.g. values-sbx.yaml runs the guard in Warn)
+│                                   # The manifests themselves (Istio Gateway, SecretStore guard, ...)
+│                                   # live in the versioned `platform-config` chart, pinned PER CLUSTER
+│                                   # via envs/<env>/<cloud>/<region>/versions.yaml:platformConfig and
+│                                   # promoted sbx → dev → stg → prd (NOT applied from HEAD to all).
 │
 ├── tools/                          # validators (run in CI, and locally)
 │   ├── validate_platform.py        # this repo's consistency: fleet <-> versions, tenant layout, template drift, chart source
@@ -85,8 +89,7 @@ holds platform-admin policy. Onboarding a team needs no edit to any global file.
 
 ## Versioned promotion (add-ons; golden chart is team-owned)
 
-`environments/<env>/<cloud>/<region>/versions.yaml` pins each **add-on** version for **that
-specific cluster**. The add-ons ApplicationSet selects the file via the cluster's
+`envs/<env>/<cloud>/<region>/versions.yaml` pins each **add-on** version AND the **platformConfig** (platform cluster-wide config chart) version for **that specific cluster**. Both the add-ons AND the platform-config chart therefore promote the same way: bump sbx, soak, then advance dev/stg/prd by a CODEOWNERS-gated PR. The add-ons ApplicationSet selects the file via the cluster's
 `environment` + `cloud` + `region` labels (matrix: cluster generator → templated git-files
 path) and templates `targetRevision` from it. Promotion is a CODEOWNERS-gated PR per cluster:
 bump sbx, soak, then advance the matching dev → stg → prd cluster file. Because each cluster

@@ -1,0 +1,6 @@
+# sbx overlay: run the tenant SecretStore guard in OBSERVE (Warn) mode so a new/updated rule soaks
+# here before it is promoted to Deny in higher envs (the chart default is Deny). Promotion of the
+# guard rule itself is just a platformConfig version bump per cluster.
+secretstoreGuard:
+  validationActions:
+    - Warn
