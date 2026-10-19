@@ -49,7 +49,7 @@ spec:
     spec:
       project: TEAM_NAME
       sources:
-        - repoURL: ghcr.io/krupakar-hyland/charts # OCI Helm registry (no scheme); see argocd/base/repo-golden-charts.yaml
+        - repoURL: ghcr.io/krupakar-hyland/charts # OCI Helm registry (no scheme); see argocd/repositories/repo-golden-charts.yaml
           chart: golden-service
           targetRevision: '{{ if and (hasKey . "goldenChart") .goldenChart }}{{ .goldenChart }}{{ else }}MISSING-goldenChart-in-leaf{{ end }}'
           helm:

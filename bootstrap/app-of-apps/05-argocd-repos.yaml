@@ -1,0 +1,28 @@
+# Argo CD repository registrations (e.g. the golden-service OCI Helm registry) managed from Git,
+# so they survive a cluster rebuild instead of needing a manual kubectl apply.
+# NOTE: argocd-cm / argocd-rbac-cm are intentionally NOT here — the Helm install owns them
+# (configs.cm/rbac.create=true) so Argo CD can start on a fresh cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-repositories
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-15"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/krupakar-hyland/platform-gitops
+    targetRevision: main
+    path: argocd/repositories
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
