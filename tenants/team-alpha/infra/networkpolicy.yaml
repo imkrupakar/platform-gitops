@@ -27,7 +27,7 @@ spec:
               tenant: team-alpha
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
+              kubernetes.io/metadata.name: istio-ingress
   egress:
     - to:
         - namespaceSelector:
