@@ -1,0 +1,27 @@
+# Argo CD manages its own configuration (CM / params / RBAC) on THIS cluster.
+# Identical on every cluster; install-time differences (HA, identities) live in the
+# cluster-provisioning Terraform, not here.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-self
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/krupakar-hyland/platform-gitops
+    targetRevision: main
+    path: argocd/base
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

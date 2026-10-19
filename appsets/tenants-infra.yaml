@@ -1,0 +1,59 @@
+# Per-tenant INFRA on THIS cluster.
+# For each tenants/<team>/ folder, deploy that tenant's namespace, ResourceQuota,
+# NetworkPolicy, and ESO SecretStore to the local cluster. Runs on every cluster, so
+# each environment gets its tenant namespaces automatically.
+#
+# Two sources per tenant:
+#   tenants/<team>/infra/                    cloud-agnostic: namespace, quota, NetworkPolicy
+#   tenants/<team>/infra-cloud/<cloud>/      cloud-specific: ESO SecretStore (azurekv | aws SecretsManager)
+# <cloud> comes from the local cluster's `cloud` label (cluster generator), so an EKS cluster
+# never receives an Azure Key Vault store. The store name is the same on every cloud.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tenants-infra
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  workloads: "true"
+          - git:
+              repoURL: https://github.com/krupakar-hyland/platform-gitops
+              revision: main
+              directories:
+                - path: tenants/*
+                - path: tenants/_template
+                  exclude: true
+  template:
+    metadata:
+      name: "tenant-{{.path.basename}}-infra"
+      annotations:
+        argocd.argoproj.io/sync-wave: "-1"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      # Platform-owned project: tenants cannot create ns/quota/netpol themselves.
+      project: platform-tenants
+      sources:
+        - repoURL: https://github.com/krupakar-hyland/platform-gitops
+          targetRevision: main
+          path: "tenants/{{.path.basename}}/infra"
+        - repoURL: https://github.com/krupakar-hyland/platform-gitops
+          targetRevision: main
+          path: "tenants/{{.path.basename}}/infra-cloud/{{.metadata.labels.cloud}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{.path.basename}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

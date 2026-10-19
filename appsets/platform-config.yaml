@@ -1,0 +1,47 @@
+# Platform configuration that must exist on EVERY cluster but is not a Helm add-on. One Application per
+# folder under config/ (today: the cert-manager ClusterIssuers that `ingress.clusterIssuer` refers to).
+# The ClusterIssuer CRD comes from the cert-manager add-on, which may not be synced yet on a brand-new
+# cluster, hence SkipDryRunOnMissingResource + retry instead of strict ordering.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform-config
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/krupakar-hyland/platform-gitops
+        revision: main
+        directories:
+          - path: config/*
+  template:
+    metadata:
+      name: "config-{{.path.basename}}"
+      annotations:
+        argocd.argoproj.io/sync-wave: "-3"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: platform-addons
+      source:
+        repoURL: https://github.com/krupakar-hyland/platform-gitops
+        targetRevision: main
+        path: "{{.path.path}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: cert-manager
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 10
+          backoff:
+            duration: 15s
+            factor: 2
+            maxDuration: 5m
+        syncOptions:
+          - ServerSideApply=true
+          - SkipDryRunOnMissingResource=true

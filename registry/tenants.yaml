@@ -1,0 +1,5 @@
+# Human-readable index of tenants (teams). Isolation source of truth is tenants/<team>/.
+tenants:
+  - name: team-alpha
+    gitops_repo: https://github.com/krupakar-hyland/team-alpha-gitops
+    namespace: team-alpha

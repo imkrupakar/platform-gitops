@@ -1,0 +1,17 @@
+# Common values for External Secrets Operator across all clusters.
+installCRDs: true
+replicaCount: 1
+# ESO pods use workload identity; label so the AKS/EKS webhook injects federated creds.
+podLabels:
+  azure.workload.identity/use: "true"
+serviceAccount:
+  annotations:
+    # Overridden per environment where the identity differs; common default here.
+    azure.workload.identity/client-id: "REPLACE_ESO_CLIENT_ID"
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi

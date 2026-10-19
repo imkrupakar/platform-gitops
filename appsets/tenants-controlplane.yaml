@@ -1,0 +1,43 @@
+# Fan-out #1: per-tenant CONTROL-PLANE resources on THIS cluster.
+# For each tenants/<team>/ folder, create one Application that applies that tenant's
+# AppProject + workload ApplicationSet into the local argocd namespace.
+# Adding a tenants/<team>/ folder => the tenant's project + workload appset appear
+# automatically (no new Application authored by hand).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tenants-controlplane
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/krupakar-hyland/platform-gitops
+        revision: main
+        directories:
+          - path: tenants/*
+          - path: tenants/_template
+            exclude: true
+  template:
+    metadata:
+      name: "tenant-{{.path.basename}}-cp"
+      annotations:
+        argocd.argoproj.io/sync-wave: "-1"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/krupakar-hyland/platform-gitops
+        targetRevision: main
+        path: "tenants/{{.path.basename}}/controlplane"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true

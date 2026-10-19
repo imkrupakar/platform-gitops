@@ -1,0 +1,6 @@
+# Common values for Argo Rollouts across all clusters (golden chart emits Rollout CRs).
+controller:
+  replicas: 1
+installCRDs: true
+dashboard:
+  enabled: true

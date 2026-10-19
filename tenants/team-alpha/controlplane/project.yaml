@@ -1,0 +1,37 @@
+# Tenant boundary for team-alpha. Constrains source repos, destinations, allowed
+# resource kinds, and which namespaces may host Application CRs (apps-in-any-namespace).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: team-alpha
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Tenant boundary for team-alpha
+  sourceRepos:
+    - https://github.com/krupakar-hyland/team-alpha-gitops
+    - ghcr.io/krupakar-hyland/charts # golden-service OCI chart registry
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: team-alpha
+  # Application CRs for this tenant may live in the team-alpha namespace on this cluster.
+  sourceNamespaces:
+    - team-alpha
+  clusterResourceWhitelist: [] # tenants create no cluster-scoped resources
+  # Tenants cannot create their own isolation/limit primitives (platform owns them).
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+  roles:
+    - name: developer
+      description: sync + read for team-alpha apps
+      policies:
+        - p, proj:team-alpha:developer, applications, get,  team-alpha/team-alpha/*, allow
+        - p, proj:team-alpha:developer, applications, sync, team-alpha/team-alpha/*, allow
+      groups:
+        - krupakar-hyland:team-alpha

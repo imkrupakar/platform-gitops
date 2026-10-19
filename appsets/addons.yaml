@@ -1,0 +1,102 @@
+# Platform add-ons delivered to THIS cluster.
+# Generators: (cluster generator x per-CLUSTER versions file) x add-on list.
+#   - clusters: the local, labeled in-cluster secret (its `environment` label picks the env).
+#   - git files: environments/<env>/<cloud>/<region>/versions.yaml, selected by the
+#     cluster's environment/cloud/region labels (matrix passes the first generator's output
+#     into the second's templated path). Promotion is therefore per cloud and per region.
+#     pathParamPrefix avoids `.path` collisions with other git generators downstream.
+#   - list: the add-on inventory (chart coordinates + sync wave).
+# The chart VERSION is NOT hardcoded here anymore: targetRevision is looked up per add-on
+# from the env versions file, so a new version can soak in sbx and be promoted up by PR.
+#
+# ESO is delivered this way (managed WITH Argo CD). It authenticates to the cloud secret
+# store via workload identity, so it needs no static secret of its own.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform-addons
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - matrix:
+              generators:
+                - clusters:
+                    selector:
+                      matchLabels:
+                        workloads: "true"
+                - git:
+                    repoURL: https://github.com/krupakar-hyland/platform-gitops
+                    revision: main
+                    pathParamPrefix: ver
+                    files:
+                      - path: "environments/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/{{.metadata.labels.region}}/versions.yaml"
+          - list:
+              elements:
+                - name: external-secrets
+                  namespace: external-secrets
+                  repoURL: https://charts.external-secrets.io
+                  chart: external-secrets
+                  wave: "-5"
+                - name: cert-manager
+                  namespace: cert-manager
+                  repoURL: https://charts.jetstack.io
+                  chart: cert-manager
+                  wave: "-5"
+                - name: ingress-nginx
+                  namespace: ingress-nginx
+                  repoURL: https://kubernetes.github.io/ingress-nginx
+                  chart: ingress-nginx
+                  wave: "-4"
+                - name: argo-rollouts
+                  namespace: argo-rollouts
+                  repoURL: https://argoproj.github.io/argo-helm
+                  chart: argo-rollouts
+                  wave: "-4"
+  template:
+    metadata:
+      name: "addon-{{.name}}-{{.nameNormalized}}"
+      annotations:
+        argocd.argoproj.io/sync-wave: "{{.wave}}"
+      labels:
+        addon: "{{.name}}"
+        environment: "{{.metadata.labels.environment}}"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: platform-addons
+      sources:
+        - repoURL: "{{.repoURL}}"
+          chart: "{{.chart}}"
+          # Version resolved per add-on from environments/<env>/versions.yaml.
+          targetRevision: "{{ index .addons .name }}"
+          helm:
+            releaseName: "{{.name}}"
+            valueFiles:
+              - $values/addons/{{.name}}/values-common.yaml
+              - $values/addons/{{.name}}/values-{{.metadata.labels.environment}}.yaml
+              # Per-region/per-cluster overlay (e.g. multi-region prod workload-identity ids).
+              - $values/addons/{{.name}}/values-{{.metadata.labels.environment}}-{{.metadata.labels.region}}.yaml
+            ignoreMissingValueFiles: true
+        - repoURL: https://github.com/krupakar-hyland/platform-gitops
+          targetRevision: main
+          ref: values
+      destination:
+        server: "{{.server}}"
+        namespace: "{{.namespace}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
