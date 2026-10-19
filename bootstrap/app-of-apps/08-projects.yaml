@@ -1,4 +1,4 @@
-# Platform-level AppProjects (addons + tenant-infra project). Tenant projects are
+# Platform-level AppProjects (addons + platform-tenants project). Tenant projects are
 # generated per-tenant by the tenants-controlplane ApplicationSet.
 apiVersion: argoproj.io/v1alpha1
 kind: Application

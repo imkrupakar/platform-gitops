@@ -1,4 +1,4 @@
-# Platform-owned project used ONLY by the tenants-infra ApplicationSet to create the
+# Platform-owned project used ONLY by the tenants-namespace ApplicationSet to create the
 # per-tenant namespace, ResourceQuota, LimitRange, and NetworkPolicy on
 # the local cluster. Tenants have no access to this project, which is why their own
 # AppProjects can safely blacklist these resource kinds.

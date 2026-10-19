@@ -45,7 +45,7 @@ platform-gitops/
 │   ├── addons.yaml                 # (cluster(local) × env versions) × add-on list → add-ons
 │   ├── platform-config.yaml        # git(config/*) → platform config that is not a Helm add-on
 │   ├── tenants-controlplane.yaml   # git(tenants/*) → per-tenant AppProject + workload appset
-│   └── tenants-infra.yaml          # (cluster × git tenants/*) → per-tenant ns/quota/netpol
+│   └── tenants-namespace.yaml      # (cluster × git tenants/*) → per-tenant ns/quota/netpol
 │                                   #   (the ESO SecretStore is team-owned; see tenants/_template/README.md)
 │
 ├── config/                         # platform config applied on every cluster
@@ -60,11 +60,11 @@ platform-gitops/
 ├── CODEOWNERS                      # every merge here reaches every cluster
 │
 ├── tenants/                        # ONE folder per tenant = isolation boundary
-│   ├── _template/                  # copy to onboard a new tenant (full infra set)
+│   ├── _template/                  # copy to onboard a new tenant (controlplane/ + namespace/)
 │   ├── team-alpha/
 │   │   ├── controlplane/{project.yaml, appset.yaml, config-appset.yaml} # config-appset syncs the team's own
 │   │   │                                                                #   config/envs/<env>/<cloud>/<region>/ (SecretStore + eso-reader SA)
-│   │   └── infra/{namespace,resourcequota,networkpolicy}.yaml          # cloud-agnostic
+│   │   └── namespace/{namespace,resourcequota,networkpolicy}.yaml      # cloud-agnostic, platform-owned
 │   └── team-beta/ (same shape)
 │
 └── registry/                       # tenants.yaml — human-readable team -> repo index.
@@ -112,7 +112,7 @@ root (Terraform applies, per cluster) ──▶ bootstrap/app-of-apps/
    └── 10-appsets     ──▶ appsets/
          ├── addons.yaml             ──▶ ESO, cert-manager, ingress, rollouts (local cluster)
          ├── tenants-controlplane    ──▶ per-tenant AppProject + workload appset
-         └── tenants-infra           ──▶ per-tenant ns/quota/netpol/ESO store (local cluster)
+         └── tenants-namespace       ──▶ per-tenant ns/quota/netpol (local cluster)
                      │
                      └── tenant workload appset ──▶ golden chart + team values ──▶ workloads
                              (env selected from the local cluster's `environment` label)

@@ -4,7 +4,7 @@
 Checks
   1. fleet.yaml <-> environments/<env>/<cloud>/<region>/versions.yaml, both directions; labels match
      the path; `addons` keys equal the add-on list in appsets/addons.yaml; no `goldenChart` (team-owned)
-  2. every tenant (and _template) has controlplane/{appset,config-appset,project}.yaml and infra/
+  2. every tenant (and _template) has controlplane/{appset,config-appset,project}.yaml and namespace/
      (the SecretStore is team-owned: <team>-gitops/config/envs/<env>/<cloud>/<region>/)
   3. each tenant's workload AppSet, config AppSet and AppProject equal the _template (modulo the team name):
      no silent drift between the template and what is deployed
@@ -121,7 +121,7 @@ def main():
     for t in tenants:
         name = os.path.basename(t)
         need = ["controlplane/appset.yaml", "controlplane/config-appset.yaml", "controlplane/project.yaml",
-                "infra/namespace.yaml", "infra/resourcequota.yaml", "infra/networkpolicy.yaml"]
+                "namespace/namespace.yaml", "namespace/resourcequota.yaml", "namespace/networkpolicy.yaml"]
         for f in need:
             if not os.path.isfile(os.path.join(t, f)):
                 err(f"tenants/{name}/{f} missing")

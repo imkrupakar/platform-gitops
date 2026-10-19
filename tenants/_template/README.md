@@ -3,7 +3,7 @@
 Copy this folder to `tenants/<team>/` and replace `TEAM_NAME` to onboard a team.
 
 Platform owns (here, in platform-gitops):
-- `infra/` — namespace, ResourceQuota, LimitRange, NetworkPolicy (cloud-agnostic isolation).
+- `namespace/` — Namespace, ResourceQuota, LimitRange, NetworkPolicy (cloud-agnostic isolation).
 - `controlplane/` — the team AppProject + two ApplicationSets: `appset.yaml` (workloads, per service)
   and `config-appset.yaml` (team namespaced config, per cluster). Both are installed into argocd by
   the `tenant-<team>-cp` Application, so there is no separate top-level appset for team config.

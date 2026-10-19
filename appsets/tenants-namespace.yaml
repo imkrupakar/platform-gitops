@@ -1,6 +1,6 @@
-# Per-tenant INFRA on THIS cluster.
-# For each tenants/<team>/ folder, deploy that tenant's cloud-agnostic isolation primitives
-# (namespace, ResourceQuota, LimitRange, NetworkPolicy) to the local cluster. Platform-owned.
+# Per-tenant NAMESPACE on THIS cluster.
+# For each tenants/<team>/ folder, deploy tenants/<team>/namespace/: the tenant's Namespace and its
+# cloud-agnostic isolation primitives (ResourceQuota, LimitRange, NetworkPolicy). Platform-owned.
 #
 # NOTE: the per-tenant ESO SecretStore is NO LONGER created here. Teams own their own vault and
 # author their SecretStore (and other namespaced config) in their gitops repo under
@@ -9,7 +9,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: tenants-infra
+  name: tenants-namespace
   namespace: argocd
 spec:
   goTemplate: true
@@ -35,7 +35,7 @@ spec:
     preserveResourcesOnDeletion: true
   template:
     metadata:
-      name: "tenant-{{.path.basename}}-infra"
+      name: "tenant-{{.path.basename}}-namespace"
       annotations:
         argocd.argoproj.io/sync-wave: "-1"
       finalizers:
@@ -46,7 +46,7 @@ spec:
       sources:
         - repoURL: https://github.com/krupakar-hyland/platform-gitops
           targetRevision: main
-          path: "tenants/{{.path.basename}}/infra"
+          path: "tenants/{{.path.basename}}/namespace"
       destination:
         server: https://kubernetes.default.svc
         namespace: "{{.path.basename}}"

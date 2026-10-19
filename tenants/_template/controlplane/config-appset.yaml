@@ -63,7 +63,7 @@ spec:
           prune: true
           selfHeal: true
         retry:
-          limit: -1 # unlimited: the namespace (tenants-infra) may not exist yet on a fresh cluster, and a failed auto-sync is not retried on the same commit
+          limit: -1 # unlimited: the namespace (tenants-namespace) may not exist yet on a fresh cluster, and a failed auto-sync is not retried on the same commit
           backoff:
             duration: 10s
             factor: 2

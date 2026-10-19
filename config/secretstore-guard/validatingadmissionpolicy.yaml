@@ -1,6 +1,6 @@
 # Guardrail for TEAM-AUTHORED ESO SecretStores (teams write them in <team>-gitops/config/envs/...).
 # Built-in ValidatingAdmissionPolicy (GA since k8s 1.30), so no Kyverno/OPA add-on is needed.
-# Applies only to namespaces labelled `tenant` (every tenants/<team>/infra/namespace.yaml sets it).
+# Applies only to namespaces labelled `tenant` (every tenants/<team>/namespace/namespace.yaml sets it).
 #
 # Enforces:
 #   - provider is azurekv or aws only
