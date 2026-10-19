@@ -3,8 +3,9 @@
 # (namespace, ResourceQuota, LimitRange, NetworkPolicy) to the local cluster. Platform-owned.
 #
 # NOTE: the per-tenant ESO SecretStore is NO LONGER created here. Teams own their own vault and
-# author their SecretStore as a config file in their gitops repo (<team>-gitops/infra/<cloud>/),
-# applied by the tenants-config ApplicationSet. See appsets/tenants-config.yaml.
+# author their SecretStore (and other namespaced config) in their gitops repo under
+# config/envs/<env>/<cloud>/<region>/, applied by the team's own <team>-config ApplicationSet
+# co-located in tenants/<team>/controlplane/config-appset.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
