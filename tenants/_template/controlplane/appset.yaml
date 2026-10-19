@@ -49,11 +49,9 @@ spec:
     spec:
       project: TEAM_NAME
       sources:
-        # Sandbox: golden chart sourced from the git repo (path), using the same GitHub App auth.
-        # (Production design pulls it from the ghcr.io/krupakar-hyland/charts OCI registry by goldenChart tag.)
-        - repoURL: https://github.com/krupakar-hyland/golden-helm-charts
-          targetRevision: main
-          path: charts/golden-service
+        - repoURL: ghcr.io/krupakar-hyland/charts # OCI Helm registry (no scheme); see argocd/base/repo-golden-charts.yaml
+          chart: golden-service
+          targetRevision: '{{ if and (hasKey . "goldenChart") .goldenChart }}{{ .goldenChart }}{{ else }}MISSING-goldenChart-in-leaf{{ end }}'
           helm:
             releaseName: "{{ index .path.segments 1 }}"
             # Cluster identity for cloud-aware chart logic (e.g. workload-identity labels).
