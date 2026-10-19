@@ -28,6 +28,11 @@ spec:
                 - path: tenants/*
                 - path: tenants/_template
                   exclude: true
+  # Deleting this ApplicationSet, or one of its Applications (tenant folder removed or renamed),
+  # must NEVER cascade into deleting a tenant namespace and everything in it. Offboarding a tenant
+  # therefore needs a manual `kubectl delete namespace <team>` after its folder is removed.
+  syncPolicy:
+    preserveResourcesOnDeletion: true
   template:
     metadata:
       name: "tenant-{{.path.basename}}-infra"

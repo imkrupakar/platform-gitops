@@ -1,0 +1,58 @@
+# Guardrail for TEAM-AUTHORED ESO SecretStores (teams write them in <team>-gitops/config/envs/...).
+# Built-in ValidatingAdmissionPolicy (GA since k8s 1.30), so no Kyverno/OPA add-on is needed.
+# Applies only to namespaces labelled `tenant` (every tenants/<team>/infra/namespace.yaml sets it).
+#
+# Enforces:
+#   - provider is azurekv or aws only
+#   - auth goes through the team's dedicated `eso-reader` ServiceAccount (never `default`, never
+#     omitted, which would fall back to the ESO controller's own credentials)
+#   - no static credentials: azurekv must use WorkloadIdentity (not ServicePrincipal or the node's
+#     ManagedIdentity); aws must use jwt (IRSA), not secretRef access keys
+# Cross-team isolation itself comes from each team's federated credential / IAM trust policy
+# matching exactly system:serviceaccount:<team>:eso-reader; this policy makes that the only path.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-secretstore-guard
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["external-secrets.io"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["secretstores"]
+    namespaceSelector:
+      matchExpressions:
+        - key: tenant
+          operator: Exists
+  variables:
+    - name: p
+      expression: "object.spec.provider"
+  validations:
+    - expression: "has(variables.p.azurekv) || has(variables.p.aws)"
+      message: "tenant SecretStores may only use the azurekv or aws provider"
+    - expression: >-
+        !has(variables.p.azurekv) || (
+          has(variables.p.azurekv.authType) && variables.p.azurekv.authType == 'WorkloadIdentity' &&
+          !has(variables.p.azurekv.authSecretRef) &&
+          has(variables.p.azurekv.serviceAccountRef) &&
+          variables.p.azurekv.serviceAccountRef.name == 'eso-reader' &&
+          !has(variables.p.azurekv.serviceAccountRef.namespace))
+      message: "azurekv SecretStores must use authType WorkloadIdentity with serviceAccountRef.name eso-reader (no authSecretRef)"
+    - expression: >-
+        !has(variables.p.aws) || (
+          has(variables.p.aws.auth) && has(variables.p.aws.auth.jwt) &&
+          !has(variables.p.aws.auth.secretRef) &&
+          has(variables.p.aws.auth.jwt.serviceAccountRef) &&
+          variables.p.aws.auth.jwt.serviceAccountRef.name == 'eso-reader' &&
+          !has(variables.p.aws.auth.jwt.serviceAccountRef.namespace))
+      message: "aws SecretStores must use auth.jwt (IRSA) with serviceAccountRef.name eso-reader (no secretRef)"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-secretstore-guard
+spec:
+  policyName: tenant-secretstore-guard
+  validationActions: ["Deny"]

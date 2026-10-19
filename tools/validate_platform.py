@@ -4,9 +4,9 @@
 Checks
   1. fleet.yaml <-> environments/<env>/<cloud>/<region>/versions.yaml, both directions; labels match
      the path; `addons` keys equal the add-on list in appsets/addons.yaml; no `goldenChart` (team-owned)
-  2. every tenant (and _template) has controlplane/{appset,project}.yaml, infra/, and an
-     infra-cloud/<cloud>/ SecretStore for EVERY cloud in the fleet (a missing one breaks that cluster)
-  3. each tenant's workload AppSet and AppProject equal the _template (modulo the team name):
+  2. every tenant (and _template) has controlplane/{appset,config-appset,project}.yaml and infra/
+     (the SecretStore is team-owned: <team>-gitops/config/envs/<env>/<cloud>/<region>/)
+  3. each tenant's workload AppSet, config AppSet and AppProject equal the _template (modulo the team name):
      no silent drift between the template and what is deployed
   4. the golden chart source is consistent: AppSet repoURL == the Argo CD repository Secret url ==
      an entry in every tenant AppProject's sourceRepos, and the missing-pin safe default is present
@@ -120,12 +120,11 @@ def main():
     tenants = sorted(d for d in glob.glob(os.path.join(PLATFORM, "tenants", "*")) if os.path.isdir(d))
     for t in tenants:
         name = os.path.basename(t)
-        need = ["controlplane/appset.yaml", "controlplane/project.yaml", "infra/namespace.yaml",
-                "infra/resourcequota.yaml", "infra/networkpolicy.yaml"]
-        need += [f"infra-cloud/{c}/externalsecret-store.yaml" for c in clouds]
+        need = ["controlplane/appset.yaml", "controlplane/config-appset.yaml", "controlplane/project.yaml",
+                "infra/namespace.yaml", "infra/resourcequota.yaml", "infra/networkpolicy.yaml"]
         for f in need:
             if not os.path.isfile(os.path.join(t, f)):
-                err(f"tenants/{name}/{f} missing" + (" (the cluster's cloud has no secret store for this tenant)" if "infra-cloud" in f else ""))
+                err(f"tenants/{name}/{f} missing")
 
     # ---- 3. drift against the template
     tpl = os.path.join(PLATFORM, "tenants", "_template", "controlplane")
@@ -133,7 +132,7 @@ def main():
         name = os.path.basename(t)
         if name == "_template":
             continue
-        for f in ("appset.yaml", "project.yaml"):
+        for f in ("appset.yaml", "config-appset.yaml", "project.yaml"):
             actual, template = os.path.join(t, "controlplane", f), os.path.join(tpl, f)
             if not (os.path.isfile(actual) and os.path.isfile(template)):
                 continue

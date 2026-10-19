@@ -19,7 +19,7 @@ spec:
     - TEAM_NAME
   # Empty: tenants create NO cluster-scoped resources (forbids ClusterSecretStore/ClusterExternalSecret
   # — only the platform may create those for shared secrets). Namespaced SecretStore/ExternalSecret
-  # ARE allowed: teams author their own SecretStore in <team>-gitops/infra/<cloud>/.
+  # ARE allowed: teams author their own SecretStore in <team>-gitops/config/envs/<env>/<cloud>/<region>/.
   clusterResourceWhitelist: []
   namespaceResourceBlacklist:
     - group: ""

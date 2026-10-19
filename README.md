@@ -45,14 +45,15 @@ platform-gitops/
 │   ├── addons.yaml                 # (cluster(local) × env versions) × add-on list → add-ons
 │   ├── platform-config.yaml        # git(config/*) → platform config that is not a Helm add-on
 │   ├── tenants-controlplane.yaml   # git(tenants/*) → per-tenant AppProject + workload appset
-│   └── tenants-infra.yaml          # (cluster × git tenants/*) → per-tenant ns/quota/netpol + the
-│                                   #   cloud-specific ESO store (infra-cloud/<cluster's cloud>)
+│   └── tenants-infra.yaml          # (cluster × git tenants/*) → per-tenant ns/quota/netpol
+│                                   #   (the ESO SecretStore is team-owned; see tenants/_template/README.md)
 │
 ├── config/                         # platform config applied on every cluster
-│   └── cluster-issuers/            # cert-manager ClusterIssuers (letsencrypt-staging / -prod) used by ingress.clusterIssuer
+│   ├── cluster-issuers/            # cert-manager ClusterIssuers (letsencrypt-staging / -prod) used by ingress.clusterIssuer
+│   └── secretstore-guard/          # ValidatingAdmissionPolicy: tenant SecretStores must use eso-reader + workload identity/IRSA
 │
 ├── tools/                          # validators (run in CI, and locally)
-│   ├── validate_platform.py        # this repo's consistency: fleet <-> versions, tenant stores per cloud, template drift, chart source
+│   ├── validate_platform.py        # this repo's consistency: fleet <-> versions, tenant layout, template drift, chart source
 │   └── check_team_layout.py        # the team-repo checks (leaf layout, goldenChart policy + ring order, render with the PINNED chart)
 │
 ├── .github/workflows/              # validate.yml (this repo's PR check), validate-team-repo.yml (REUSABLE; team repos call it)
@@ -61,9 +62,9 @@ platform-gitops/
 ├── tenants/                        # ONE folder per tenant = isolation boundary
 │   ├── _template/                  # copy to onboard a new tenant (full infra set)
 │   ├── team-alpha/
-│   │   ├── controlplane/{project.yaml, appset.yaml}
-│   │   ├── infra/{namespace,resourcequota,networkpolicy}.yaml          # cloud-agnostic
-│   │   └── infra-cloud/{azure,aws}/externalsecret-store.yaml           # picked by the cluster's `cloud` label
+│   │   ├── controlplane/{project.yaml, appset.yaml, config-appset.yaml} # config-appset syncs the team's own
+│   │   │                                                                #   config/envs/<env>/<cloud>/<region>/ (SecretStore + eso-reader SA)
+│   │   └── infra/{namespace,resourcequota,networkpolicy}.yaml          # cloud-agnostic
 │   └── team-beta/ (same shape)
 │
 └── registry/                       # tenants.yaml — human-readable team -> repo index.
@@ -124,9 +125,10 @@ clusters of one environment differ (cloud, region), only the optional cloud/leaf
 ## Onboarding a tenant = one PR
 
 1. `cp -r tenants/_template tenants/team-gamma` and replace `TEAM_NAME`, set quota, and
-   set each cloud's secret store under `infra-cloud/<cloud>/` (vault URL / AWS region).
+   The team adds its SecretStore + `eso-reader` ServiceAccount in its own repo under
+   `config/envs/<env>/<cloud>/<region>/` (see `tenants/_template/README.md`).
 2. Merge. On every cluster, the fan-out ApplicationSets create gamma's AppProject,
-   namespace, quota, NetworkPolicy, ESO store, and workload ApplicationSet with
+   namespace, quota, NetworkPolicy, workload ApplicationSet, and config ApplicationSet with
    **zero kubectl**. Gamma's first service goes live when team-gamma commits a
    `values.yaml` to their own `team-gamma-gitops` repo.
 

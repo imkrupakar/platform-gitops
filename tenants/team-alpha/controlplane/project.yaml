@@ -24,7 +24,7 @@ spec:
   clusterResourceWhitelist: []
   # Tenants cannot create their own isolation/limit primitives (platform owns them). Namespaced
   # external-secrets.io SecretStore + ExternalSecret ARE allowed: teams own their vault and author
-  # their SecretStore as a config file in their gitops repo (infra/<cloud>/).
+  # their SecretStore as a config file in their gitops repo (config/envs/<env>/<cloud>/<region>/).
   namespaceResourceBlacklist:
     - group: ""
       kind: ResourceQuota

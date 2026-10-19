@@ -1,13 +1,12 @@
 # Common values for External Secrets Operator across all clusters.
 installCRDs: true
 replicaCount: 1
-# ESO pods use workload identity; label so the AKS/EKS webhook injects federated creds.
-podLabels:
-  azure.workload.identity/use: "true"
-serviceAccount:
-  annotations:
-    # Overridden per environment where the identity differs; common default here.
-    azure.workload.identity/client-id: "REPLACE_ESO_CLIENT_ID"
+# The ESO controller deliberately has NO cloud identity (no workload-identity label/annotation).
+# A SecretStore without serviceAccountRef falls back to the controller's own credentials, so any
+# identity given to the controller would be usable by every tenant-authored SecretStore. Every
+# store authenticates through an explicit serviceAccountRef instead: tenants use their own
+# `eso-reader` SA (enforced by config/secretstore-guard), and the platform ClusterSecretStore
+# (when added) uses a dedicated SA in the external-secrets namespace.
 resources:
   requests:
     cpu: 50m
