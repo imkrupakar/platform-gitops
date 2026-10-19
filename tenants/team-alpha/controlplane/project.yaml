@@ -12,6 +12,7 @@ spec:
   sourceRepos:
     - https://github.com/krupakar-hyland/team-alpha-gitops
     - ghcr.io/krupakar-hyland/charts # golden-service OCI chart registry
+    - https://github.com/krupakar-hyland/golden-helm-charts # sandbox: chart via git path
   destinations:
     - server: https://kubernetes.default.svc
       namespace: team-alpha
