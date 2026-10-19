@@ -1,0 +1,12 @@
+# istiod control plane. Gateway API (standard) is supported automatically when the
+# gateway.networking.k8s.io CRDs are present (installed early by 03-gateway-api-crds).
+# The data-plane ingress gateway is auto-provisioned by Istio from the platform Gateway
+# resource (config/istio-gateway), so no standalone gateway chart is needed.
+pilot:
+  autoscaleEnabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+meshConfig:
+  accessLogFile: /dev/stdout

@@ -1,9 +1,0 @@
-# Common values for ingress-nginx across all clusters.
-controller:
-  replicaCount: 2
-  service:
-    type: LoadBalancer
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi

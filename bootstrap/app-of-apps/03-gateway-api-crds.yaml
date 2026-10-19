@@ -1,0 +1,28 @@
+# Kubernetes Gateway API (standard channel) CRDs — must exist before istiod reconciles Gateways
+# and before any Gateway/HTTPRoute. Vendored from gateway-api v1.6.3. Very early sync-wave.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway-api-crds
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-17"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/krupakar-hyland/platform-gitops
+    targetRevision: main
+    path: gateway-api-crds
+    directory:
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

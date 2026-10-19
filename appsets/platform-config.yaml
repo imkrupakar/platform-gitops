@@ -1,7 +1,8 @@
 # Platform configuration that must exist on EVERY cluster but is not a Helm add-on. One Application per
-# folder under config/ (today: the cert-manager ClusterIssuers that `ingress.clusterIssuer` refers to).
-# The ClusterIssuer CRD comes from the cert-manager add-on, which may not be synced yet on a brand-new
-# cluster, hence SkipDryRunOnMissingResource + retry instead of strict ordering.
+# folder under config/ (today: the shared Istio Gateway in config/istio-gateway). Resources that
+# depend on CRDs not yet synced on a brand-new cluster are tolerated via SkipDryRunOnMissingResource
+# + retry. Namespaced manifests carry their own metadata.namespace; the destination below is only the
+# fallback namespace.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -31,7 +32,7 @@ spec:
         path: "{{.path.path}}"
       destination:
         server: https://kubernetes.default.svc
-        namespace: cert-manager
+        namespace: istio-ingress
       syncPolicy:
         automated:
           prune: true
@@ -45,3 +46,4 @@ spec:
         syncOptions:
           - ServerSideApply=true
           - SkipDryRunOnMissingResource=true
+          - CreateNamespace=true

@@ -41,16 +41,16 @@ spec:
                   repoURL: https://charts.external-secrets.io
                   chart: external-secrets
                   wave: "-5"
-                - addon: cert-manager
-                  namespace: cert-manager
-                  repoURL: https://charts.jetstack.io
-                  chart: cert-manager
+                - addon: istio-base
+                  namespace: istio-system
+                  repoURL: https://istio-release.storage.googleapis.com/charts
+                  chart: base
+                  wave: "-6"
+                - addon: istiod
+                  namespace: istio-system
+                  repoURL: https://istio-release.storage.googleapis.com/charts
+                  chart: istiod
                   wave: "-5"
-                - addon: ingress-nginx
-                  namespace: ingress-nginx
-                  repoURL: https://kubernetes.github.io/ingress-nginx
-                  chart: ingress-nginx
-                  wave: "-4"
                 - addon: argo-rollouts
                   namespace: argo-rollouts
                   repoURL: https://argoproj.github.io/argo-helm

@@ -1,7 +1,0 @@
-# Common values for cert-manager across all clusters.
-installCRDs: true
-replicaCount: 1
-resources:
-  requests:
-    cpu: 50m
-    memory: 128Mi

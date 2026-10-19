@@ -1,0 +1,2 @@
+# istio-base: installs Istio CRDs + cluster roles into istio-system. No app-specific tuning.
+defaultRevision: default

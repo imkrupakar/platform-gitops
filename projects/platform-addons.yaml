@@ -1,6 +1,6 @@
-# Project for platform add-ons (ESO, cert-manager, ingress, rollouts). Add-ons may
+# Project for platform add-ons (ESO, Istio, rollouts) + the shared Istio Gateway. Add-ons may
 # install CRDs and cluster-scoped resources, so this project is deliberately broad —
-# but it is reserved for Platform Engineering and the add-ons ApplicationSet only.
+# but it is reserved for Platform Engineering and the add-ons/platform-config ApplicationSets.
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
@@ -13,16 +13,15 @@ spec:
   sourceRepos:
     - https://github.com/krupakar-hyland/platform-gitops
     - https://charts.external-secrets.io
-    - https://charts.jetstack.io
-    - https://kubernetes.github.io/ingress-nginx
+    - https://istio-release.storage.googleapis.com/charts
     - https://argoproj.github.io/argo-helm
   destinations:
     - server: https://kubernetes.default.svc
       namespace: external-secrets
     - server: https://kubernetes.default.svc
-      namespace: cert-manager
+      namespace: istio-system
     - server: https://kubernetes.default.svc
-      namespace: ingress-nginx
+      namespace: istio-ingress
     - server: https://kubernetes.default.svc
       namespace: argo-rollouts
     - server: https://kubernetes.default.svc

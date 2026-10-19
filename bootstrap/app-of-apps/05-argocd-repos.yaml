@@ -1,7 +1,3 @@
-# Argo CD repository registrations (e.g. the golden-service OCI Helm registry) managed from Git,
-# so they survive a cluster rebuild instead of needing a manual kubectl apply.
-# NOTE: argocd-cm / argocd-rbac-cm are intentionally NOT here — the Helm install owns them
-# (configs.cm/rbac.create=true) so Argo CD can start on a fresh cluster.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
