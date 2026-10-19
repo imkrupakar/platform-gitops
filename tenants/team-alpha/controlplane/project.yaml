@@ -19,8 +19,12 @@ spec:
   # Application CRs for this tenant may live in the team-alpha namespace on this cluster.
   sourceNamespaces:
     - team-alpha
-  clusterResourceWhitelist: [] # tenants create no cluster-scoped resources
-  # Tenants cannot create their own isolation/limit primitives (platform owns them).
+  # Empty: tenants create NO cluster-scoped resources. This is what forbids a team from creating
+  # a cluster-wide ClusterSecretStore/ClusterExternalSecret — only the platform may (shared secrets).
+  clusterResourceWhitelist: []
+  # Tenants cannot create their own isolation/limit primitives (platform owns them). Namespaced
+  # external-secrets.io SecretStore + ExternalSecret ARE allowed: teams own their vault and author
+  # their SecretStore as a config file in their gitops repo (infra/<cloud>/).
   namespaceResourceBlacklist:
     - group: ""
       kind: ResourceQuota

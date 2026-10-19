@@ -1,5 +1,5 @@
 # Platform-owned project used ONLY by the tenants-infra ApplicationSet to create the
-# per-tenant namespace, ResourceQuota, LimitRange, NetworkPolicy, and ESO SecretStore on
+# per-tenant namespace, ResourceQuota, LimitRange, and NetworkPolicy on
 # the local cluster. Tenants have no access to this project, which is why their own
 # AppProjects can safely blacklist these resource kinds.
 apiVersion: argoproj.io/v1alpha1
@@ -26,7 +26,3 @@ spec:
       kind: LimitRange
     - group: networking.k8s.io
       kind: NetworkPolicy
-    - group: external-secrets.io
-      kind: SecretStore
-    - group: external-secrets.io
-      kind: ExternalSecret

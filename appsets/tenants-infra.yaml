@@ -1,13 +1,10 @@
 # Per-tenant INFRA on THIS cluster.
-# For each tenants/<team>/ folder, deploy that tenant's namespace, ResourceQuota,
-# NetworkPolicy, and ESO SecretStore to the local cluster. Runs on every cluster, so
-# each environment gets its tenant namespaces automatically.
+# For each tenants/<team>/ folder, deploy that tenant's cloud-agnostic isolation primitives
+# (namespace, ResourceQuota, LimitRange, NetworkPolicy) to the local cluster. Platform-owned.
 #
-# Two sources per tenant:
-#   tenants/<team>/infra/                    cloud-agnostic: namespace, quota, NetworkPolicy
-#   tenants/<team>/infra-cloud/<cloud>/      cloud-specific: ESO SecretStore (azurekv | aws SecretsManager)
-# <cloud> comes from the local cluster's `cloud` label (cluster generator), so an EKS cluster
-# never receives an Azure Key Vault store. The store name is the same on every cloud.
+# NOTE: the per-tenant ESO SecretStore is NO LONGER created here. Teams own their own vault and
+# author their SecretStore as a config file in their gitops repo (<team>-gitops/infra/<cloud>/),
+# applied by the tenants-secretstore ApplicationSet. See appsets/tenants-secretstore.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -44,9 +41,6 @@ spec:
         - repoURL: https://github.com/krupakar-hyland/platform-gitops
           targetRevision: main
           path: "tenants/{{.path.basename}}/infra"
-        - repoURL: https://github.com/krupakar-hyland/platform-gitops
-          targetRevision: main
-          path: "tenants/{{.path.basename}}/infra-cloud/{{.metadata.labels.cloud}}"
       destination:
         server: https://kubernetes.default.svc
         namespace: "{{.path.basename}}"
