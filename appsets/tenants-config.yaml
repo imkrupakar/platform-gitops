@@ -1,0 +1,81 @@
+# Per-tenant NAMESPACED CONFIG sourced from the TEAM's own gitops repo (team-owned content,
+# platform-owned wiring). For each tenants/<team>/ folder and the local cluster, create ONE
+# Application (under the TEAM's AppProject) that combines the team's own namespaced manifests from
+# two paths in <team>-gitops via Argo CD multiple sources:
+#   (1) common/                                  -> manifests applied to EVERY cluster the team runs
+#                                                   on (cloud/env/region-agnostic: ServiceAccounts,
+#                                                   Istio AuthorizationPolicy/PeerAuthentication,
+#                                                   extra NetworkPolicy, ConfigMaps, PDBs, ...).
+#   (2) clusters/<cloud>/<env>/<region>/         -> per-cluster manifests, keyed by the cluster's
+#                                                   cloud/environment/region labels (the ESO
+#                                                   SecretStore today; a prod vault is a different
+#                                                   vault/subscription than sbx). The store NAME
+#                                                   stays constant across clusters so the golden
+#                                                   chart's externalSecret.storeRef is agnostic.
+# Both sources are TEAM-OWNED and share the TEAM's project/destination -- the legitimate use of
+# multiple sources (compose one owner's manifests), NOT a way to merge platform-owned infra with
+# team content (that stays a separate Application under the platform project). Directory recursion
+# means teams add new manifest files without any platform wiring change. The platform never authors
+# these resources; it only declares the repo/path convention.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tenants-config
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  workloads: "true"
+          - git:
+              repoURL: https://github.com/krupakar-hyland/platform-gitops
+              revision: main
+              directories:
+                - path: tenants/*
+                - path: tenants/_template
+                  exclude: true
+  template:
+    metadata:
+      name: "tenant-{{.path.basename}}-config"
+      annotations:
+        argocd.argoproj.io/sync-wave: "-1"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      # The TEAM's AppProject: SecretStore and the other namespaced manifests are resources the team
+      # is allowed to create; teams still cannot create cluster-scoped resources such as a
+      # ClusterSecretStore (the team AppProject keeps clusterResourceWhitelist []).
+      project: "{{.path.basename}}"
+      sources:
+        # (1) cloud/env/region-agnostic team manifests applied to every cluster
+        - repoURL: "https://github.com/krupakar-hyland/{{.path.basename}}-gitops"
+          targetRevision: main
+          path: common
+          directory:
+            recurse: true
+        # (2) per-cluster team manifests (ESO SecretStore today), keyed by cloud/env/region labels
+        - repoURL: "https://github.com/krupakar-hyland/{{.path.basename}}-gitops"
+          targetRevision: main
+          path: "clusters/{{.metadata.labels.cloud}}/{{.metadata.labels.environment}}/{{.metadata.labels.region}}"
+          directory:
+            recurse: true
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{.path.basename}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - ServerSideApply=true

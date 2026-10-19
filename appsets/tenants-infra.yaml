@@ -4,7 +4,7 @@
 #
 # NOTE: the per-tenant ESO SecretStore is NO LONGER created here. Teams own their own vault and
 # author their SecretStore as a config file in their gitops repo (<team>-gitops/infra/<cloud>/),
-# applied by the tenants-secretstore ApplicationSet. See appsets/tenants-secretstore.yaml.
+# applied by the tenants-config ApplicationSet. See appsets/tenants-config.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
