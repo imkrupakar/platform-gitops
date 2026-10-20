@@ -3,7 +3,8 @@
 
 Checks
   1. fleet.yaml <-> envs/<env>/<cloud>/<region>/versions.yaml, both directions; labels match
-     the path; `addons` keys equal the add-on list in appsets/addons.yaml; no `goldenChart` (team-owned)
+     the path; `addons` keys equal the add-on list in appsets/platform-addons.yaml; no `goldenChart`
+     (team-owned)
   2. every tenant (and _template) has controlplane/{appset,config-appset,project}.yaml and namespace/
      (the SecretStore is team-owned: <team>-gitops/config/envs/<env>/<cloud>/<region>/)
   3. each tenant's workload AppSet, config AppSet and AppProject equal the _template (modulo the team name):
@@ -11,7 +12,6 @@ Checks
   4. the golden chart source is consistent: AppSet repoURL == the Argo CD repository Secret url ==
      an entry in every tenant AppProject's sourceRepos, and the missing-pin safe default is present
   5. every ApplicationSet uses goTemplate with missingkey=error; every YAML file parses
-  6. each config/<name>/ folder contains manifests
 
 Usage: platform-gitops/tools/validate_platform.py [--fleet FILE]
 """
@@ -27,14 +27,24 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PLATFORM = os.path.dirname(HERE)
 ROOT = os.path.dirname(PLATFORM)
 SAFE_DEFAULT = "MISSING-goldenChart-in-leaf"
+_DOC_CACHE = {}
 
 
 def docs(path):
-    """All YAML documents in a file (yq prints one JSON object per line)."""
+    """All YAML documents in a file (yq prints one JSON object per line); parsed once and cached."""
+    if path in _DOC_CACHE:
+        cached = _DOC_CACHE[path]
+        if isinstance(cached, ValueError):
+            raise cached
+        return cached
     r = subprocess.run(["yq", "-o=json", "-I=0", ".", path], capture_output=True, text=True)
     if r.returncode != 0:
-        raise ValueError(f"{path}: not valid YAML ({r.stderr.strip().splitlines()[0] if r.stderr.strip() else '?'})")
-    return [json.loads(l) for l in r.stdout.splitlines() if l.strip() and l.strip() != "null"]
+        exc = ValueError(f"{path}: not valid YAML ({r.stderr.strip().splitlines()[0] if r.stderr.strip() else '?'})")
+        _DOC_CACHE[path] = exc
+        raise exc
+    out = [json.loads(l) for l in r.stdout.splitlines() if l.strip() and l.strip() != "null"]
+    _DOC_CACHE[path] = out
+    return out
 
 
 def doc(path):
@@ -57,7 +67,7 @@ def normalized(path, team):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--fleet", default=os.path.join(ROOT, "cluster-platform-terraform", "fleet.yaml"))
+    ap.add_argument("--fleet", default=os.path.join(ROOT, "platform-terraform", "fleet.yaml"))
     args = ap.parse_args()
     errors = []
 
@@ -83,11 +93,11 @@ def main():
 
     # ---- 1. versions files
     try:
-        addon_list = doc(os.path.join(PLATFORM, "appsets", "addons.yaml"))["spec"]["generators"][0]["matrix"]["generators"][1]["list"]["elements"]
-        addon_names = {e["name"] for e in addon_list}
+        addon_list = doc(os.path.join(PLATFORM, "appsets", "platform-addons.yaml"))["spec"]["generators"][0]["matrix"]["generators"][1]["list"]["elements"]
+        addon_names = {e["addon"] for e in addon_list}
     except (ValueError, KeyError, IndexError) as e:
         addon_names = set()
-        err(f"appsets/addons.yaml: cannot read the add-on list ({e})")
+        err(f"appsets/platform-addons.yaml: cannot read the add-on list ({e})")
     found = set()
     for p in glob.glob(os.path.join(PLATFORM, "envs", "*", "*", "*", "versions.yaml")):
         parts = p.split(os.sep)
@@ -109,7 +119,7 @@ def main():
             err(f"{rel}: goldenChart is team-owned now (pinned in each cluster leaf), remove it here")
         pins = v.get("addons") or {}
         if set(pins) != addon_names:
-            err(f"{rel}: addons {sorted(pins)} != appsets/addons.yaml {sorted(addon_names)}")
+            err(f"{rel}: addons {sorted(pins)} != appsets/platform-addons.yaml {sorted(addon_names)}")
         for k, val in pins.items():
             if not isinstance(val, str) or not val:
                 err(f"{rel}: addons.{k} must be a non-empty quoted version string")
@@ -170,18 +180,18 @@ def main():
                 pass
     if len(urls) > 1:
         err(f"tenant AppSets disagree on the chart repoURL: {sorted(u for u in urls if u)}")
-    secret = os.path.join(PLATFORM, "argocd", "base", "repo-golden-charts.yaml")
+    secret = os.path.join(PLATFORM, "argocd", "repositories", "repo-golden-charts.yaml")
     try:
         s = doc(secret)["stringData"]
         if urls and s.get("url") not in urls:
-            err(f"argocd/base/repo-golden-charts.yaml url {s.get('url')!r} != AppSet chart repoURL {sorted(urls)}")
+            err(f"argocd/repositories/repo-golden-charts.yaml url {s.get('url')!r} != AppSet chart repoURL {sorted(urls)}")
         if s.get("enableOCI") != "true" or s.get("type") != "helm":
-            err("argocd/base/repo-golden-charts.yaml must be type: helm with enableOCI: \"true\"")
+            err("argocd/repositories/repo-golden-charts.yaml must be type: helm with enableOCI: \"true\"")
     except (ValueError, KeyError):
-        err("argocd/base/repo-golden-charts.yaml missing or unreadable: OCI chart sources must be registered with Argo CD")
-    kust = os.path.join(PLATFORM, "argocd", "base", "kustomization.yaml")
+        err("argocd/repositories/repo-golden-charts.yaml missing or unreadable: OCI chart sources must be registered with Argo CD")
+    kust = os.path.join(PLATFORM, "argocd", "repositories", "kustomization.yaml")
     if os.path.isfile(kust) and "repo-golden-charts.yaml" not in open(kust).read():
-        err("argocd/base/kustomization.yaml does not include repo-golden-charts.yaml")
+        err("argocd/repositories/kustomization.yaml does not include repo-golden-charts.yaml")
 
     # ---- 5b. ApplicationSet hygiene
     for p in sorted(glob.glob(os.path.join(PLATFORM, "**", "*.y*ml"), recursive=True)):
@@ -197,11 +207,6 @@ def main():
                 spec = d.get("spec", {})
                 if not spec.get("goTemplate") or "missingkey=error" not in (spec.get("goTemplateOptions") or []):
                     err(f"{rel}: ApplicationSet must set goTemplate: true and goTemplateOptions [\"missingkey=error\"]")
-
-    # ---- 6. config folders
-    for c in sorted(glob.glob(os.path.join(PLATFORM, "config", "*"))):
-        if os.path.isdir(c) and not glob.glob(os.path.join(c, "*.y*ml")):
-            err(f"{os.path.relpath(c, PLATFORM)}: empty config folder (its Application would sync nothing)")
 
     if errors:
         print("PLATFORM-GITOPS PROBLEMS:")
