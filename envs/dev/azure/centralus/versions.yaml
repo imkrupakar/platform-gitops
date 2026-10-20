@@ -1,0 +1,15 @@
+# Pinned versions for cluster dev-azure-centralus. Selected automatically on THIS
+# cluster via its environment/cloud/region labels. Promotion is per cluster (per cloud and
+# per region) — bump sbx first, soak, then advance the matching dev/stg/prd cluster file by a
+# CODEOWNERS-gated PR. Editing one file never touches another cloud/region.
+environment: dev
+cloud: azure
+region: centralus
+# Platform cluster-wide config bundle (gateway + secretstore-guard), one versioned chart pinned here
+# and promoted per cluster like add-ons. Per-env value overlays live in config/envs/<env>/<cloud>/<region>/values.yaml.
+platformConfig: "0.1.0"
+addons:
+  external-secrets: "0.10.4"
+  istio-base: "1.30.6"
+  istiod: "1.30.6"
+  argo-rollouts: "2.37.3"
