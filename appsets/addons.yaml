@@ -76,10 +76,11 @@ spec:
           helm:
             releaseName: "{{.addon}}"
             valueFiles:
-              - $values/addons/{{.addon}}/values-common.yaml
-              - $values/addons/{{.addon}}/values-{{.metadata.labels.environment}}.yaml
-              # Per-region/per-cluster overlay (e.g. multi-region prod workload-identity ids).
-              - $values/addons/{{.addon}}/values-{{.metadata.labels.environment}}-{{.metadata.labels.region}}.yaml
+              - $values/addons/{{.addon}}/base/values.yaml
+              - $values/addons/{{.addon}}/envs/{{.metadata.labels.environment}}/values.yaml
+              - $values/addons/{{.addon}}/envs/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/values.yaml
+              # Per-cluster overlay (e.g. multi-region prod workload-identity ids).
+              - $values/addons/{{.addon}}/envs/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/{{.metadata.labels.region}}/values.yaml
             ignoreMissingValueFiles: true
         - repoURL: https://github.com/krupakar-hyland/platform-gitops
           targetRevision: main

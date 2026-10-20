@@ -35,11 +35,12 @@ platform-gitops/
 │   ├── platform-addons.yaml
 │   └── platform-tenants.yaml
 │
-├── addons/                         # platform add-on values (ESO, cert-manager, ingress, rollouts)
-│   ├── external-secrets/values-common.yaml
-│   ├── cert-manager/values-common.yaml
-│   ├── ingress-nginx/values-common.yaml
-│   └── argo-rollouts/values-common.yaml
+├── addons/                         # platform add-on VALUES (layered like apps: base + envs/<env>/<cloud>/<region>)
+│   ├── external-secrets/base/values.yaml
+│   ├── istio-base/base/values.yaml
+│   ├── istiod/base/values.yaml
+│   └── argo-rollouts/base/values.yaml
+│                                   # per-cluster overrides (optional): addons/<addon>/envs/<env>/<cloud>/<region>/values.yaml
 │
 ├── appsets/                        # ApplicationSets (all target the LOCAL cluster)
 │   ├── addons.yaml                 # (cluster(local) × env versions) × add-on list → add-ons
@@ -48,9 +49,10 @@ platform-gitops/
 │   └── tenants-namespace.yaml      # (cluster × git tenants/*) → per-tenant ns/quota/netpol
 │                                   #   (the ESO SecretStore is team-owned; see tenants/_template/README.md)
 │
-├── config/                         # VALUES for the platform-config chart (per-env overlays)
-│   ├── values-common.yaml          # applied on every cluster (gateway + secretstore-guard enabled)
-│   └── values-<env>.yaml           # per-env overlay (e.g. values-sbx.yaml runs the guard in Warn)
+├── config/                         # VALUES for the platform-config chart (layered like apps)
+│   ├── base/values.yaml            # applied on every cluster (gateway + secretstore-guard enabled)
+│   └── envs/<env>/values.yaml      # per-env overlay (e.g. envs/sbx/values.yaml runs the guard in Warn);
+│                                   # deeper envs/<env>/<cloud>/<region>/values.yaml optional
 │                                   # The manifests themselves (Istio Gateway, SecretStore guard, ...)
 │                                   # live in the versioned `platform-config` chart, pinned PER CLUSTER
 │                                   # via envs/<env>/<cloud>/<region>/versions.yaml:platformConfig and

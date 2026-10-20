@@ -6,7 +6,7 @@ environment: sbx
 cloud: azure
 region: centralus
 # Platform cluster-wide config bundle (gateway + secretstore-guard), one versioned chart pinned here
-# and promoted per cluster like add-ons. Per-env value overlays live in config/values-<env>.yaml.
+# and promoted per cluster like add-ons. Per-env value overlays live in config/envs/<env>/<cloud>/<region>/values.yaml.
 platformConfig: "0.1.0"
 addons:
   external-secrets: "0.10.4"

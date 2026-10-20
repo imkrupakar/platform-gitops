@@ -7,7 +7,7 @@
 # into the templated git-files path). The chart version is read from that file as `platformConfig`.
 # pathParamPrefix avoids `.path` collisions with the `$values` ref source.
 #
-# Per-env value overlays live in config/values-{common,<env>,<env>-<region>}.yaml (e.g. sbx runs the
+# Per-env value overlays live in config/{base,envs/<env>,envs/<env>/<cloud>,envs/<env>/<cloud>/<region>}/values.yaml (e.g. sbx runs the
 # SecretStore guard in Warn mode to soak before Deny in higher envs). New platform config is added to
 # the chart (new template + chart version bump), then promoted here by bumping `platformConfig`.
 apiVersion: argoproj.io/v1alpha1
@@ -49,9 +49,10 @@ spec:
           helm:
             releaseName: platform-config
             valueFiles:
-              - $values/config/values-common.yaml
-              - $values/config/values-{{.metadata.labels.environment}}.yaml
-              - $values/config/values-{{.metadata.labels.environment}}-{{.metadata.labels.region}}.yaml
+              - $values/config/base/values.yaml
+              - $values/config/envs/{{.metadata.labels.environment}}/values.yaml
+              - $values/config/envs/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/values.yaml
+              - $values/config/envs/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/{{.metadata.labels.region}}/values.yaml
             ignoreMissingValueFiles: true
         - repoURL: https://github.com/krupakar-hyland/platform-gitops
           targetRevision: main
