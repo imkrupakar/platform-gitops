@@ -16,7 +16,7 @@ Application teams never commit here — except once, to onboard: a single PR tha
 This repo is **cluster-agnostic**: the identical config is pulled by the **standalone Argo CD
 running on every cluster**. A cluster learns *who it is* (environment, cloud, region) from a
 labeled in-cluster secret created by the cluster-provisioning Terraform (separate repo
-[`platform-terraform`](../platform-terraform)). ApplicationSets read those labels to render the
+`platform-terraform`). ApplicationSets read those labels to render the
 right versions and values for that cluster. There is no hub and no cross-cluster registry here —
 every cluster manages only itself, from the same Git.
 
