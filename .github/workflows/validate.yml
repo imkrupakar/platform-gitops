@@ -16,7 +16,7 @@ jobs:
       - name: Check out fleet.yaml (the list of clusters)
         uses: actions/checkout@v4
         with:
-          repository: krupakar-hyland/cluster-platform-terraform
+          repository: krupakar-hyland/platform-terraform
           path: tf
           token: ${{ secrets.PLATFORM_READ_TOKEN || github.token }} # needed when that repo is private
       - name: Platform consistency (fleet, versions, tenants, template drift, chart source)

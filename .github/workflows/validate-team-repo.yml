@@ -32,7 +32,7 @@ jobs:
           token: ${{ secrets.PLATFORM_READ_TOKEN || github.token }}
       - uses: actions/checkout@v4
         with:
-          repository: krupakar-hyland/cluster-platform-terraform
+          repository: krupakar-hyland/platform-terraform
           path: tf
           token: ${{ secrets.PLATFORM_READ_TOKEN || github.token }}
       - uses: actions/checkout@v4
