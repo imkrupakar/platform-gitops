@@ -1,5 +1,9 @@
 # platform-gitops
 
+> 📖 **New here? Start with the [Platform Guide](docs/platform-guide.md)** — the end-to-end tour of how
+> the multi-cluster, multi-cloud platform fits together and how to add a service, region, cloud, team or
+> environment. This README covers just the design of *this* repo.
+
 The single source of truth for Argo CD configuration, platform add-ons, AppProjects,
 ApplicationSets, and tenant isolation (namespace / quota / NetworkPolicy). Owned by
 **Platform Engineering**.
