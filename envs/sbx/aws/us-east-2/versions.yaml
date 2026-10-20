@@ -9,7 +9,7 @@ region: us-east-2
 # and promoted per cluster like add-ons. Per-env value overlays live in config/envs/<env>/<cloud>/<region>/values.yaml.
 platformConfig: "0.1.0"
 addons:
-  external-secrets: "0.10.4"
+  external-secrets: "2.13.0"
   istio-base: "1.30.6"
   istiod: "1.30.6"
   argo-rollouts: "2.37.3"
