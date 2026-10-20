@@ -7,8 +7,9 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-17"
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  # Finalizer intentionally removed: Gateway API CRDs are migrating to Terraform (foundation).
+  # Without the resources-finalizer, deleting this Application ORPHANS the CRDs (keeps them) instead
+  # of cascade-deleting every Gateway/HTTPRoute. This file is removed once Terraform owns the CRDs.
 spec:
   project: default
   source:
