@@ -448,16 +448,26 @@ This is a reference implementation. Before real use:
   (`nonprodacrplatform`, `prodacrplatform`, a geo-replicated prod ACR, a per-region prod ECR) and a
   single shared nonprod digest. Terraform currently provisions a **per-cluster ACR/ECR** instead
   (e.g. `acrplatsbxcus...`, an ECR in `us-east-2`). Pick one model and align the workflows, the
-  `check_team_layout.py` prd registry guard, and `base/values.yaml` (which should not hardcode a
-  per-cluster registry).
-- The GitHub organisation is `krupakar-hyland` throughout. Still to replace with real values: registry names, the state buckets, and every `REPLACE_*` value (ESO client IDs, AWS account IDs, role ARNs).
-- `modules/aks-cluster`, `eks-cluster` and `gke-cluster` are placeholders for your real cluster modules.
-- Cluster inventory lives only in `platform-terraform/fleet.yaml` (CI-validated). `platform-gitops/registry/tenants.yaml` is a light team→repo index; the tenant isolation source of truth is the `tenants/<team>/` folders.
-- Tenant secret stores use one vault per team (not per environment or region); the AWS store pins `us-east-2`.
-- `validate_fleet.py` needs PyYAML installed.
-- The CI security scans (gitleaks, `govulncheck`, Trivy) exist only in `orders-api`; the other app repos still run vet + build. They are also not required checks, and `cd.yml` does not wait for `ci.yml`.
-- Signature verification happens in `promote` only; clusters do not verify at admission (no Kyverno/policy-controller). `az acr import` does not copy cosign signatures, so prod ACR images carry none; provenance is proven at the nonprod registry instead.
-- North-south TLS is terminated at an external L7 load balancer; the Istio Gateway listener is plain HTTP, and there is no in-cluster cert-manager. The external front door (App Gateway / Front Door) that terminates TLS and forwards to the gateway is not part of these repos.
-- Open from the platform review (not addressed yet): no compatibility matrix or automated updates for add-on pins; no Argo Rollouts analysis, observability or Argo CD notifications; tenants cannot open NetworkPolicy egress; Argo CD `policy.default: role:readonly`; `platform-gitops@main` is pulled by every cluster at once; S3 Terraform backends have no state locking; CI pushes the sbx pin with a static `GITOPS_PAT`.
-- Global traffic management (one public hostname across regions) is not part of these repos.
-- The ApplicationSets (nested matrix plus git files generator) were validated by rendering. Do the first dry run on the sbx cluster.
+  `check_team_layout.py` prd registry guard, and `base/values.yaml`.
+- **Argo CD namespace creation vs Rancher is not yet worked out.** How Argo CD creates and owns tenant
+  namespaces when a cluster is managed by Rancher — which has its own Projects / namespace ownership and
+  labels and may contend with `CreateNamespace=true` — still needs to be discovered and validated.
+- **Argo CD GitOps RBAC is placeholder.** The AppProject `roles` / `groups`, the tenant `developer`
+  policy, and `argocd-rbac-cm` (`policy.default: role:readonly`) use example `krupakar-hyland:<team>`
+  groups; wire them to real IdP groups before relying on them.
+- The GitHub organisation is `krupakar-hyland` throughout; replace registry names, state buckets, and
+  every `REPLACE_*` value (ESO client IDs, AWS account IDs, role ARNs) with real ones.
+- `modules/gke-cluster` is a placeholder; `aks-cluster` / `eks-cluster` provision real clusters but are thin.
+- CI supply-chain scans (gitleaks, `govulncheck`, Trivy) exist only in `orders-api`; they are not required
+  checks, and `cd.yml` does not wait for `ci.yml`.
+- Signature verification happens in `promote` only; clusters do not verify at admission (no Kyverno /
+  policy-controller). `az acr import` does not copy cosign signatures, so prod ACR images carry none;
+  provenance is proven at the nonprod registry.
+- The external L7 front door (App Gateway / Front Door) that terminates TLS, and global traffic management
+  (one public hostname across regions), are not part of these repos.
+- Other open items: no add-on compatibility matrix or automated pin updates; no Argo Rollouts analysis,
+  observability or Argo CD notifications; tenants cannot open NetworkPolicy egress; `platform-gitops@main`
+  is pulled by every cluster at once; S3 Terraform backends have no state locking; CI pushes the sbx pin
+  with a static `GITOPS_PAT`.
+- The ApplicationSets (nested matrix plus git files generator) were validated by rendering. Do the first
+  dry run on the sbx cluster.
