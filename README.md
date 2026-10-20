@@ -1,150 +1,140 @@
 # platform-gitops
 
-Source of truth for Argo CD configuration, platform add-ons, AppProjects, ApplicationSets,
-and tenant isolation (namespaces / quota / NetworkPolicy). Owned by **Platform
-Engineering**. Application teams never commit here except to onboard (a single PR adding a
-`tenants/<team>/` folder).
+The single source of truth for Argo CD configuration, platform add-ons, AppProjects,
+ApplicationSets, and tenant isolation (namespace / quota / NetworkPolicy). Owned by
+**Platform Engineering**.
 
-This repo is **cluster-agnostic**: the identical config is pulled by the **standalone Argo
-CD on every cluster**. Each cluster's environment is discovered from the labeled in-cluster
-secret created by the cluster-provisioning Terraform (separate repo `platform-terraform`).
-There is no hub and no cross-cluster registry here.
+Application teams never commit here — except once, to onboard: a single PR that adds a
+`tenants/<team>/` folder.
+
+## How it works in one paragraph
+
+This repo is **cluster-agnostic**: the identical config is pulled by the **standalone Argo CD
+running on every cluster**. A cluster learns *who it is* (environment, cloud, region) from a
+labeled in-cluster secret created by the cluster-provisioning Terraform (separate repo
+[`platform-terraform`](../platform-terraform)). ApplicationSets read those labels to render the
+right versions and values for that cluster. There is no hub and no cross-cluster registry here —
+every cluster manages only itself, from the same Git.
 
 ## Directory map
 
 ```
 platform-gitops/
-├── bootstrap/
-│   └── app-of-apps/                # what the per-cluster root Application points at
-│       ├── 00-argocd-self.yaml     # Argo CD manages its own config (→ argocd/base)
-│       ├── 08-projects.yaml        # platform AppProjects (→ projects/)
-│       └── 10-appsets.yaml         # platform ApplicationSets (→ appsets/)
-│                                   # NB: foundational CRDs (Kubernetes Gateway API) are NOT here —
-│                                   # they are installed by Terraform (foundation, like Argo CD),
-│                                   # pinned per cluster via gateway_api_version in the cluster tfvars.
+├── bootstrap/app-of-apps/      # what each cluster's root Application points at (one per concern)
+│   ├── 05-argocd-repos.yaml    #   → argocd/repositories   (register the golden-charts OCI registry)
+│   ├── 08-projects.yaml        #   → projects/             (platform AppProjects)
+│   └── 10-appsets.yaml         #   → appsets/              (platform ApplicationSets)
 │
-├── argocd/                         # Argo CD self-config (HOT-RELOADED cm/rbac only)
-│   └── base/{kustomization,argocd-cm,argocd-rbac-cm,repo-golden-charts}.yaml
-│                                   # repo-golden-charts: declares the OCI chart registry (enableOCI) to Argo CD
-│                                   # NB: argocd-cmd-params-cm is owned by the Helm install
-│                                   # (startup params need a controlled pod restart).
+├── argocd/repositories/        # repository registrations applied by Argo CD (hot-loaded)
+│   └── repo-golden-charts.yaml #   the ghcr.io OCI chart registry (enableOCI)
 │
-├── envs/                           # per-CLUSTER pinned platform versions: ADD-ONS + platformConfig (the golden chart is pinned by teams, in their leaves)
-│   └── <env>/<cloud>/<region>/versions.yaml
-│                                   # promote per cloud/region: sbx → dev → stg → prd, one
-│                                   # cluster at a time (editing one never touches another)
-│
-├── projects/                       # platform-owned AppProjects
+├── projects/                   # platform-owned AppProjects
 │   ├── platform-addons.yaml
 │   └── platform-tenants.yaml
 │
-├── addons/                         # platform add-on VALUES (layered like apps: base + envs/<env>/<cloud>/<region>)
-│   ├── external-secrets/base/values.yaml
-│   ├── istio-base/base/values.yaml
-│   ├── istiod/base/values.yaml
-│   └── argo-rollouts/base/values.yaml
-│                                   # per-cluster overrides (optional): addons/<addon>/envs/<env>/<cloud>/<region>/values.yaml
+├── appsets/                    # ApplicationSets — all target the LOCAL cluster
+│   ├── platform-addons.yaml    #   add-on list × env versions        → ESO, Istio, Argo Rollouts
+│   ├── platform-config.yaml    #   env versions                      → platform-config chart
+│   ├── tenants-controlplane.yaml #  git(tenants/*)                   → per-tenant AppProject + workload appset
+│   └── tenants-namespace.yaml  #   cluster × git(tenants/*)          → per-tenant ns / quota / netpol
 │
-├── appsets/                        # ApplicationSets (all target the LOCAL cluster)
-│   ├── addons.yaml                 # (cluster(local) × env versions) × add-on list → add-ons
-│   ├── platform-config.yaml        # cluster(local) × env versions → the platform-config chart (Gateway + SecretStore guard)
-│   ├── tenants-controlplane.yaml   # git(tenants/*) → per-tenant AppProject + workload appset
-│   └── tenants-namespace.yaml      # (cluster × git tenants/*) → per-tenant ns/quota/netpol
-│                                   #   (the ESO SecretStore is team-owned; see tenants/_template/README.md)
+├── envs/                       # per-CLUSTER version pins (add-ons + platformConfig)
+│   └── <env>/<cloud>/<region>/versions.yaml
 │
-├── config/                         # VALUES for the platform-config chart (layered like apps)
-│   ├── base/values.yaml            # applied on every cluster (gateway + secretstore-guard enabled)
-│   └── envs/<env>/values.yaml      # per-env overlay (e.g. envs/sbx/values.yaml runs the guard in Warn);
-│                                   # deeper envs/<env>/<cloud>/<region>/values.yaml optional
-│                                   # The manifests themselves (Istio Gateway, SecretStore guard, ...)
-│                                   # live in the versioned `platform-config` chart, pinned PER CLUSTER
-│                                   # via envs/<env>/<cloud>/<region>/versions.yaml:platformConfig and
-│                                   # promoted sbx → dev → stg → prd (NOT applied from HEAD to all).
+├── addons/                     # add-on Helm values, layered: base + envs/<env>/<cloud>/<region>
+│   └── <addon>/base/values.yaml
 │
-├── tools/                          # validators (run in CI, and locally)
-│   ├── validate_platform.py        # this repo's consistency: fleet <-> versions, tenant layout, template drift, chart source
-│   └── check_team_layout.py        # the team-repo checks (leaf layout, goldenChart policy + ring order, render with the PINNED chart)
+├── config/                     # values for the platform-config chart, layered: base + envs/<env>
+│   ├── base/values.yaml
+│   └── envs/<env>/values.yaml
 │
-├── .github/workflows/              # validate.yml (this repo's PR check), validate-team-repo.yml (REUSABLE; team repos call it)
-├── CODEOWNERS                      # every merge here reaches every cluster
+├── tenants/                    # ONE folder per tenant = one isolation boundary
+│   ├── _template/              #   copy this to onboard (controlplane/ + namespace/)
+│   └── team-alpha/
+│       ├── controlplane/       #   project.yaml, appset.yaml, config-appset.yaml
+│       └── namespace/          #   namespace, resourcequota, networkpolicy (platform-owned)
 │
-├── tenants/                        # ONE folder per tenant = isolation boundary
-│   ├── _template/                  # copy to onboard a new tenant (controlplane/ + namespace/)
-│   ├── team-alpha/
-│   │   ├── controlplane/{project.yaml, appset.yaml, config-appset.yaml} # config-appset syncs the team's own
-│   │   │                                                                #   config/envs/<env>/<cloud>/<region>/ (SecretStore + eso-reader SA)
-│   │   └── namespace/{namespace,resourcequota,networkpolicy}.yaml      # cloud-agnostic, platform-owned
-│   └── team-beta/ (same shape)
-│
-└── registry/                       # tenants.yaml — human-readable team -> repo index.
-    └── tenants.yaml                #   (Cluster inventory lives in platform-terraform/fleet.yaml.)
+├── registry/tenants.yaml       # human-readable team → repo index (cluster list lives in platform-terraform/fleet.yaml)
+├── tools/                      # onboard-tenant.sh + CI validators (validate_platform.py, check_team_layout.py)
+├── .github/workflows/          # validate.yml (this repo) + validate-team-repo.yml (reusable, called by team repos)
+└── CODEOWNERS                  # every merge here reaches every cluster
 ```
 
-## Argo CD config ownership (no split-brain)
+## What flows from the one root Application
 
-Config is split by reload semantics so Helm and Argo CD never fight over the same object:
+Terraform applies a single root Application per cluster; everything below is pure GitOps and is
+identical on every cluster:
+
+```
+root  ──▶  bootstrap/app-of-apps/
+   ├── 05-argocd-repos  ──▶  argocd/repositories/      (golden-charts OCI registry)
+   ├── 08-projects      ──▶  projects/                 (platform AppProjects)
+   └── 10-appsets       ──▶  appsets/
+         ├── addons             ──▶  ESO, Istio (base + istiod), Argo Rollouts
+         ├── platform-config    ──▶  platform-config chart (Istio Gateway + SecretStore guard)
+         ├── tenants-controlplane ─▶  per-tenant AppProject + workload appset
+         └── tenants-namespace  ──▶  per-tenant namespace / quota / NetworkPolicy
+                 │
+                 └── tenant workload appset ──▶  golden chart + team values ──▶ workloads
+```
+
+Because every cluster *is* one environment, a `dev` cluster renders `dev` values and a `prd`
+cluster renders `prd` values from the same Git — no per-cluster config duplication. Where clusters
+of the same environment differ (cloud, region), only the optional cloud/region overlay files differ.
+
+## Argo CD config ownership
+
+Argo CD's own settings are split by who can safely write them, so nothing fights over an object:
 
 | Object | Owner | Why |
 | --- | --- | --- |
-| `argocd-cmd-params-cm` | **Helm install** (`configs.params`) | consumed at startup → needs a controlled pod restart |
-| `argocd-cm`, `argocd-rbac-cm` | **GitOps** (`argocd/base`, via `configs.*.create: false`) | hot-reloaded → `argocd-self` is the single writer |
+| `argocd-cm`, `argocd-rbac-cm`, `argocd-cmd-params-cm` | **Helm install** (in `platform-terraform`) | installed and upgraded with Argo CD itself; params need a controlled pod restart |
+| `repo-golden-charts` repository secret | **This repo** (`argocd/repositories/`) | a plain registration Argo CD hot-loads — safe to manage from Git |
 
-Tenant RBAC lives in each tenant's AppProject `roles`; the global `argocd-rbac-cm` only
-holds platform-admin policy. Onboarding a team needs no edit to any global file.
+Tenant RBAC is **not** global: it lives in each tenant's AppProject `roles` (see
+`tenants/team-alpha/controlplane/project.yaml`). The cluster-wide `argocd-rbac-cm` only holds
+platform-admin policy, so onboarding a team edits no global file.
 
-## Versioned promotion (add-ons + platform-config; golden chart is team-owned)
+## Versioned promotion
 
-`envs/<env>/<cloud>/<region>/versions.yaml` pins, **for that one cluster**, each **add-on** version and
-the **platformConfig** (platform cluster-wide config chart) version. The ApplicationSets select the file
-via the cluster's `environment` + `cloud` + `region` labels (a matrix: cluster generator → templated
-git-files path) and template `targetRevision` from it. Promotion is a CODEOWNERS-gated PR per cluster:
-bump **sbx**, soak, then advance **dev → stg → prd**. Because each cluster has its own file, a dev bump on
-Azure/centralus never touches dev on AWS — you promote per cloud and per region, not a whole environment
-at once.
+`envs/<env>/<cloud>/<region>/versions.yaml` pins, **for that one cluster**, each add-on version and
+the `platformConfig` (platform-config chart) version. ApplicationSets select the file from the
+cluster's `environment` + `cloud` + `region` labels and template `targetRevision` from it.
 
-**Each team owns its golden chart version.** They set `goldenChart` directly in their own cluster **leaf**
-cluster **leaf** (`…/<region>/values.yaml`, the same file that holds the image pin), so a team
-adopts a new chart version on its own schedule, independently of other teams and other
-services on the same cluster. The team workload ApplicationSet still uses the cluster's
-`environment`/`cloud`/`region` labels to select the team's own config, layered
-`base → envs/<env> → envs/<env>/<cloud> → envs/<env>/<cloud>/<region>`
-(all optional except base). The ApplicationSet also passes `global.cloud/region/environment`
-to the golden chart so cloud-specific bits (workload-identity labels) are rendered by the
-chart, not hardcoded by teams. See `team-alpha-gitops/README.md`.
+Promotion is a CODEOWNERS-gated PR, **one cluster at a time**: bump `sbx`, soak, then advance
+`dev → stg → prd`. Because every cluster owns its own file, a dev bump on Azure/centralus never
+touches dev on AWS — you promote per cloud and per region, never a whole environment at once.
 
-## What flows from one root Application (identical on every cluster)
-
-```
-root (Terraform applies, per cluster) ──▶ bootstrap/app-of-apps/
-   ├── 00-argocd-self ──▶ argocd/base                     (Argo CD cm + rbac)
-   ├── 08-projects    ──▶ projects/                       (platform AppProjects)
-   └── 10-appsets     ──▶ appsets/
-         ├── addons.yaml             ──▶ ESO, Istio (base + istiod), Argo Rollouts (local cluster)
-         ├── platform-config.yaml    ──▶ platform-config chart: Istio Gateway + SecretStore guard
-         ├── tenants-controlplane    ──▶ per-tenant AppProject + workload appset
-         └── tenants-namespace       ──▶ per-tenant ns/quota/netpol (local cluster)
-                     │
-                     └── tenant workload appset ──▶ golden chart + team values ──▶ workloads
-                             (env selected from the local cluster's `environment` label)
-```
-
-Because every cluster is one environment, a `dev` cluster renders `dev` values and a `prd`
-cluster renders `prd` values from the SAME Git — no per-cluster config duplication. Where
-clusters of one environment differ (cloud, region), only the optional cloud/leaf layers differ.
+**Teams own their own chart version.** Each team sets `goldenChart` in its own cluster leaf file
+(the same `…/<region>/values.yaml` that holds its image pin), in its own `<team>-gitops` repo. So a
+team adopts a new chart version on its own schedule, independent of other teams and other services
+on the same cluster. Team values layer `base → envs/<env> → envs/<env>/<cloud> →
+envs/<env>/<cloud>/<region>` (all optional except `base`), and the workload ApplicationSet passes
+`global.cloud/region/environment` to the golden chart so cloud-specific bits (e.g. workload-identity
+labels) are rendered by the chart rather than hardcoded by teams. See `team-alpha-gitops/README.md`.
 
 ## Onboarding a tenant = one PR
 
-1. Run `tools/onboard-tenant.sh <team>` — it copies `tenants/_template` to `tenants/<team>`, substitutes
-   `TEAM_NAME`, and registers the team in `registry/tenants.yaml`. Then review the ResourceQuota in
-   `tenants/<team>/namespace/resourcequota.yaml`. The team authors its SecretStore + `eso-reader`
-   ServiceAccount in its **own** repo under `config/envs/<env>/<cloud>/<region>/` (see
-   `tenants/_template/README.md`).
-2. Merge. On every cluster, the fan-out ApplicationSets create the team's AppProject, namespace, quota,
-   NetworkPolicy, workload ApplicationSet, and config ApplicationSet with **zero kubectl**. The team's
-   first service goes live when it commits a cluster leaf to its own `<team>-gitops` repo.
+1. Run `tools/onboard-tenant.sh <team>`. It copies `tenants/_template/` to `tenants/<team>/`,
+   substitutes `TEAM_NAME`, and registers the team in `registry/tenants.yaml`. Review the quota in
+   `tenants/<team>/namespace/resourcequota.yaml`. The team authors its own SecretStore and
+   `eso-reader` ServiceAccount in **its** repo (see `tenants/_template/README.md`).
+2. Merge. On every cluster, the fan-out ApplicationSets create the team's AppProject, namespace,
+   quota, NetworkPolicy, workload ApplicationSet, and config ApplicationSet — **zero kubectl**. The
+   team's first service goes live when it commits a cluster leaf to its own `<team>-gitops` repo.
+
+## Validation
+
+CI (`.github/workflows/validate.yml`) runs `tools/` on every PR:
+
+- `validate_platform.py` — this repo's consistency: fleet ↔ versions coverage, tenant layout,
+  template drift, chart source.
+- `check_team_layout.py` — the team-repo checks (leaf layout, `goldenChart` policy + ring order,
+  render with the pinned chart); also exposed to team repos via the reusable
+  `validate-team-repo.yml`.
 
 ## Recovery
 
 Re-running the cluster's Terraform stack reinstalls Argo CD and re-applies the single root
-Application; the app-of-apps rebuilds that cluster's entire platform and tenant workloads
-from Git. The only non-Git input is the GitHub App key (from the secret store).
+Application; the app-of-apps then rebuilds that cluster's entire platform and tenant workloads from
+Git. The only non-Git input is the GitHub App key (read from the secret store).

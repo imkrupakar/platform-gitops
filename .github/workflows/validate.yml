@@ -22,9 +22,11 @@ jobs:
       - name: Platform consistency (fleet, versions, tenants, template drift, chart source)
         run: python3 tools/validate_platform.py --fleet tf/fleet.yaml
       - name: Manifest schemas (kubeconform)
+        # config/, addons/ and envs/ hold Helm values / version pins (not Kubernetes manifests),
+        # so they are intentionally excluded — they have no kind/schema to validate.
         run: |
           docker run --rm -v "$PWD:/work:ro" -w /work "$KUBECONFORM" \
             -summary -ignore-missing-schemas -skip Kustomization \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            appsets projects tenants argocd config
+            appsets projects tenants argocd
