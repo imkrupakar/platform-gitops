@@ -19,6 +19,9 @@ platform-gitops/
 │       ├── 00-argocd-self.yaml     # Argo CD manages its own config (→ argocd/base)
 │       ├── 08-projects.yaml        # platform AppProjects (→ projects/)
 │       └── 10-appsets.yaml         # platform ApplicationSets (→ appsets/)
+│                                   # NB: foundational CRDs (Kubernetes Gateway API) are NOT here —
+│                                   # they are installed by Terraform (foundation, like Argo CD),
+│                                   # pinned per cluster via gateway_api_version in the cluster tfvars.
 │
 ├── argocd/                         # Argo CD self-config (HOT-RELOADED cm/rbac only)
 │   └── base/{kustomization,argocd-cm,argocd-rbac-cm,repo-golden-charts}.yaml
