@@ -7,8 +7,8 @@ Engineering**. Application teams never commit here except to onboard (a single P
 
 This repo is **cluster-agnostic**: the identical config is pulled by the **standalone Argo
 CD on every cluster**. Each cluster's environment is discovered from the labeled in-cluster
-secret created by the cluster-provisioning Terraform (separate repo
-`cluster-platform-terraform`). There is no hub and no cross-cluster registry here.
+secret created by the cluster-provisioning Terraform (separate repo `platform-terraform`).
+There is no hub and no cross-cluster registry here.
 
 ## Directory map
 
@@ -47,7 +47,7 @@ platform-gitops/
 │
 ├── appsets/                        # ApplicationSets (all target the LOCAL cluster)
 │   ├── addons.yaml                 # (cluster(local) × env versions) × add-on list → add-ons
-│   ├── platform-config.yaml        # git(config/*) → platform config that is not a Helm add-on
+│   ├── platform-config.yaml        # cluster(local) × env versions → the platform-config chart (Gateway + SecretStore guard)
 │   ├── tenants-controlplane.yaml   # git(tenants/*) → per-tenant AppProject + workload appset
 │   └── tenants-namespace.yaml      # (cluster × git tenants/*) → per-tenant ns/quota/netpol
 │                                   #   (the ESO SecretStore is team-owned; see tenants/_template/README.md)
@@ -77,7 +77,7 @@ platform-gitops/
 │   └── team-beta/ (same shape)
 │
 └── registry/                       # tenants.yaml — human-readable team -> repo index.
-    └── tenants.yaml                #   (Cluster inventory lives in cluster-platform-terraform/fleet.yaml.)
+    └── tenants.yaml                #   (Cluster inventory lives in platform-terraform/fleet.yaml.)
 ```
 
 ## Argo CD config ownership (no split-brain)
@@ -92,16 +92,17 @@ Config is split by reload semantics so Helm and Argo CD never fight over the sam
 Tenant RBAC lives in each tenant's AppProject `roles`; the global `argocd-rbac-cm` only
 holds platform-admin policy. Onboarding a team needs no edit to any global file.
 
-## Versioned promotion (add-ons; golden chart is team-owned)
+## Versioned promotion (add-ons + platform-config; golden chart is team-owned)
 
-`envs/<env>/<cloud>/<region>/versions.yaml` pins each **add-on** version AND the **platformConfig** (platform cluster-wide config chart) version for **that specific cluster**. Both the add-ons AND the platform-config chart therefore promote the same way: bump sbx, soak, then advance dev/stg/prd by a CODEOWNERS-gated PR. The add-ons ApplicationSet selects the file via the cluster's
-`environment` + `cloud` + `region` labels (matrix: cluster generator → templated git-files
-path) and templates `targetRevision` from it. Promotion is a CODEOWNERS-gated PR per cluster:
-bump sbx, soak, then advance the matching dev → stg → prd cluster file. Because each cluster
-has its own file, a dev bump on Azure/eastus never touches dev on AWS — you promote per cloud
-and per region, not a whole environment at once.
+`envs/<env>/<cloud>/<region>/versions.yaml` pins, **for that one cluster**, each **add-on** version and
+the **platformConfig** (platform cluster-wide config chart) version. The ApplicationSets select the file
+via the cluster's `environment` + `cloud` + `region` labels (a matrix: cluster generator → templated
+git-files path) and template `targetRevision` from it. Promotion is a CODEOWNERS-gated PR per cluster:
+bump **sbx**, soak, then advance **dev → stg → prd**. Because each cluster has its own file, a dev bump on
+Azure/centralus never touches dev on AWS — you promote per cloud and per region, not a whole environment
+at once.
 
-**Each team owns its golden chart version.** They set `goldenChart` directly in their own
+**Each team owns its golden chart version.** They set `goldenChart` directly in their own cluster **leaf**
 cluster **leaf** (`…/<region>/values.yaml`, the same file that holds the image pin), so a team
 adopts a new chart version on its own schedule, independently of other teams and other
 services on the same cluster. The team workload ApplicationSet still uses the cluster's
@@ -118,7 +119,8 @@ root (Terraform applies, per cluster) ──▶ bootstrap/app-of-apps/
    ├── 00-argocd-self ──▶ argocd/base                     (Argo CD cm + rbac)
    ├── 08-projects    ──▶ projects/                       (platform AppProjects)
    └── 10-appsets     ──▶ appsets/
-         ├── addons.yaml             ──▶ ESO, cert-manager, ingress, rollouts (local cluster)
+         ├── addons.yaml             ──▶ ESO, Istio (base + istiod), Argo Rollouts (local cluster)
+         ├── platform-config.yaml    ──▶ platform-config chart: Istio Gateway + SecretStore guard
          ├── tenants-controlplane    ──▶ per-tenant AppProject + workload appset
          └── tenants-namespace       ──▶ per-tenant ns/quota/netpol (local cluster)
                      │
@@ -132,13 +134,14 @@ clusters of one environment differ (cloud, region), only the optional cloud/leaf
 
 ## Onboarding a tenant = one PR
 
-1. `cp -r tenants/_template tenants/team-gamma` and replace `TEAM_NAME`, set quota, and
-   The team adds its SecretStore + `eso-reader` ServiceAccount in its own repo under
-   `config/envs/<env>/<cloud>/<region>/` (see `tenants/_template/README.md`).
-2. Merge. On every cluster, the fan-out ApplicationSets create gamma's AppProject,
-   namespace, quota, NetworkPolicy, workload ApplicationSet, and config ApplicationSet with
-   **zero kubectl**. Gamma's first service goes live when team-gamma commits a
-   `values.yaml` to their own `team-gamma-gitops` repo.
+1. Run `tools/onboard-tenant.sh <team>` — it copies `tenants/_template` to `tenants/<team>`, substitutes
+   `TEAM_NAME`, and registers the team in `registry/tenants.yaml`. Then review the ResourceQuota in
+   `tenants/<team>/namespace/resourcequota.yaml`. The team authors its SecretStore + `eso-reader`
+   ServiceAccount in its **own** repo under `config/envs/<env>/<cloud>/<region>/` (see
+   `tenants/_template/README.md`).
+2. Merge. On every cluster, the fan-out ApplicationSets create the team's AppProject, namespace, quota,
+   NetworkPolicy, workload ApplicationSet, and config ApplicationSet with **zero kubectl**. The team's
+   first service goes live when it commits a cluster leaf to its own `<team>-gitops` repo.
 
 ## Recovery
 
