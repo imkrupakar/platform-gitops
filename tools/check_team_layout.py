@@ -1,28 +1,40 @@
 #!/usr/bin/env python3
-"""Validate team GitOps repos before a PR can merge (drift guard + render smoke test).
+"""Check a team's GitOps repo before its PR can merge: catch mistakes and prove the config still renders.
 
-Layout under <team>-gitops/apps/<svc>/:
-    base/values.yaml
-    envs/<env>/values.yaml                       env-wide sizing           (optional layer)
-    envs/<env>/<cloud>/values.yaml               cloud-wide                (optional layer)
-    envs/<env>/<cloud>/<region>/values.yaml      CLUSTER LEAF: pins + opts the service in
+WHAT THIS GUARDS AGAINST
+  Teams describe what to deploy with layered values.yaml files. Small mistakes here (a typo'd region,
+  a chart version that was never soak-tested, an image pinned in the wrong place) would ship straight
+  to a cluster. This script runs in CI and fails the PR before that can happen.
 
-Every leaf is checked for:
-  - it maps to a cluster in fleet.yaml (catches `us-east1` typos)
-  - image.tag + image.digest live ONLY in the leaf, and the digest is sha256:...
-  - `goldenChart` is a quoted plain SemVer, inside the support policy (>= minimumSupported,
-    <= latest, warn when deprecated) and not ahead of the lower ring (soak order)
-  - it does not use top-level keys that collide with ApplicationSet generator params
-  - `helm template` of the leaf's PINNED chart version succeeds with the same layered values and
-    global.* the ApplicationSet passes (needs --chart-oci or --chart-packages; otherwise the local
-    chart is used and the run says so)
-  - the rendered image host matches the cloud, and prd never pulls from a *nonprod* registry
+HOW A SERVICE IS DESCRIBED  (files under <team>-gitops/apps/<svc>/)
+  Settings are layered from general to specific; a more specific file overrides a less specific one:
+    base/values.yaml                             defaults for every cluster
+    envs/<env>/values.yaml                       whole-environment settings, e.g. sbx     (optional)
+    envs/<env>/<cloud>/values.yaml               whole-cloud settings, e.g. azure         (optional)
+    envs/<env>/<cloud>/<region>/values.yaml      the "LEAF": one specific cluster
+  The leaf is special: its existence is what turns the service ON for that cluster, and it carries the
+  exact image to run (tag + digest) and the chart version to deploy with (`goldenChart`).
 
-Examples
-  monorepo (all siblings):   platform-gitops/tools/check_team_layout.py
-  one team repo in CI:       check_team_layout.py --team-repo . --fleet fleet.yaml \
-                               --chart-dir charts/golden-service --policy support-policy.yaml \
-                               --chart-oci oci://ghcr.io/krupakar-hyland/charts/golden-service
+WHAT IT CHECKS ON EVERY LEAF
+  - the cluster is real: the <env>/<cloud>/<region> matches an entry in fleet.yaml (catches typos
+    like `us-east1` instead of `us-east-2`)
+  - the image (tag + digest) is pinned ONLY in the leaf, and the digest is a real sha256:... value
+  - the chart version `goldenChart` is a plain SemVer like "2.7.0" and is allowed by the support
+    policy: not older than the minimum supported, not newer than the latest, warned if deprecated
+  - rings are promoted in order: a cluster may not run a newer chart than the ring below it, so every
+    version soaks in a lower environment first  (ring order: sbx -> dev -> stg -> prd)
+  - the leaf doesn't use reserved top-level keys that would clash with the deployment machinery
+  - it actually renders: `helm template` of the leaf's pinned chart + its layered values succeeds
+    (pass --chart-oci or --chart-packages to use the published chart; otherwise it falls back to the
+    local chart and says so)
+  - the image comes from the right registry: the host matches the cloud, and prd never pulls from a
+    non-prod registry
+
+HOW TO RUN IT
+  check everything in the monorepo:   platform-gitops/tools/check_team_layout.py
+  check one team repo (as CI does):   check_team_layout.py --team-repo . --fleet fleet.yaml \
+                                        --chart-dir charts/golden-service --policy support-policy.yaml \
+                                        --chart-oci oci://ghcr.io/krupakar-hyland/charts/golden-service
 """
 import argparse
 import glob
