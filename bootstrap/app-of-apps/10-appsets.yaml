@@ -16,7 +16,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/krupakar-hyland/platform-gitops
-    targetRevision: main
+    targetRevision: rancher-project-mapping
     path: appsets
   destination:
     server: https://kubernetes.default.svc
