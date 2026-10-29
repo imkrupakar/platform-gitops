@@ -1,0 +1,8 @@
+# Makes this tenant namespace dir a Kustomize source so the tenants-namespace ApplicationSet can
+# patch in the Rancher Project mapping (field.cattle.io/projectId) per cluster. Plain manifests below.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - networkpolicy.yaml
+  - resourcequota.yaml

@@ -23,7 +23,7 @@ spec:
                   workloads: "true"
           - git:
               repoURL: https://github.com/krupakar-hyland/platform-gitops
-              revision: main
+              revision: rancher-project-mapping
               directories:
                 - path: tenants/*
                 - path: tenants/_template
@@ -45,8 +45,19 @@ spec:
       project: platform-tenants
       sources:
         - repoURL: https://github.com/krupakar-hyland/platform-gitops
-          targetRevision: main
+          targetRevision: rancher-project-mapping
           path: "tenants/{{.path.basename}}/namespace"
+          # Map this namespace to its 1:1 Rancher Project. The in-cluster cluster Secret carries
+          # `rancher.platform.internal/project-<team> = "<clusterId>:<projectId>"` (written by Terraform
+          # from the rancher-register module). When present we stamp the field.cattle.io/projectId
+          # annotation (full id) + the short label Rancher adds itself (so Argo selfHeal does not
+          # flap); otherwise the JSON6902 patch is an empty no-op, so non-Rancher / not-yet-registered
+          # clusters render unchanged. Needs Argo CD >= 2.5 (source.kustomize.patches).
+          kustomize:
+            patches:
+              - target:
+                  kind: Namespace
+                patch: '{{- $pid := dig "metadata" "annotations" (printf "rancher.platform.internal/project-%s" .path.basename) "" (. | toJson | fromJson) -}}{{- if $pid -}}[{"op":"add","path":"/metadata/annotations/field.cattle.io~1projectId","value":{{ $pid | quote }}},{"op":"add","path":"/metadata/labels/field.cattle.io~1projectId","value":{{ $pid | splitList ":" | last | quote }}}]{{- else -}}[]{{- end -}}'
       destination:
         server: https://kubernetes.default.svc
         namespace: "{{.path.basename}}"

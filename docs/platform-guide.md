@@ -449,9 +449,18 @@ This is a reference implementation. Before real use:
   single shared nonprod digest. Terraform currently provisions a **per-cluster ACR/ECR** instead
   (e.g. `acrplatsbxcus...`, an ECR in `us-east-2`). Pick one model and align the workflows, the
   `check_team_layout.py` prd registry guard, and `base/values.yaml`.
-- **Argo CD namespace creation vs Rancher is not yet worked out.** How Argo CD creates and owns tenant
-  namespaces when a cluster is managed by Rancher — which has its own Projects / namespace ownership and
-  labels and may contend with `CreateNamespace=true` — still needs to be discovered and validated.
+- **Argo CD namespace creation vs Rancher — strategy defined + wired (POC).** A dedicated **tools
+  cluster** runs Rancher; workload clusters are **imported** (agent-only); human access uses
+  **GitHub-team** auth mapped to Rancher roles; and each Argo-created tenant namespace is placed in its
+  **1:1 Rancher Project** via the `field.cattle.io/projectId` annotation. IDs flow from the
+  **rancher-register** Terraform module (per-team `rancher2_project` + output `<clusterId>:<projectId>`)
+  onto the Argo **in-cluster Secret** annotations (`rancher.platform.internal/cluster-id` /
+  `project-<team>`), and the **`tenants-namespace` ApplicationSet** stamps the annotation + short label
+  via a conditional `kustomize.patches` JSON6902 patch (empty no-op on non-Rancher clusters). Argo stays
+  the owner of the namespace/quota/netpol; Rancher owns only access + the Project assignment (no
+  double-managed quotas). See `ArgoCDPlatform/docs/rancher-access-strategy.md` §5 and the Terraform
+  under `platform-terraform/` (`tools/rancher-cluster` + `modules/rancher-register` + the sbx stack).
+  Still to validate end-to-end once Rancher GitHub auth + `rancher_tenants` are configured.
 - **Argo CD GitOps RBAC is placeholder.** The AppProject `roles` / `groups`, the tenant `developer`
   policy, and `argocd-rbac-cm` (`policy.default: role:readonly`) use example `krupakar-hyland:<team>`
   groups; wire them to real IdP groups before relying on them.
