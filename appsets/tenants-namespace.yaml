@@ -23,7 +23,7 @@ spec:
                   workloads: "true"
           - git:
               repoURL: https://github.com/krupakar-hyland/platform-gitops
-              revision: rancher-project-mapping
+              revision: main
               directories:
                 - path: tenants/*
                 - path: tenants/_template
@@ -45,7 +45,7 @@ spec:
       project: platform-tenants
       sources:
         - repoURL: https://github.com/krupakar-hyland/platform-gitops
-          targetRevision: rancher-project-mapping
+          targetRevision: main
           path: "tenants/{{.path.basename}}/namespace"
           # Map this namespace to its 1:1 Rancher Project. The in-cluster cluster Secret carries
           # `rancher.platform.internal/project-<team> = "<clusterId>:<projectId>"` (written by Terraform

@@ -458,9 +458,9 @@ This is a reference implementation. Before real use:
   `project-<team>`), and the **`tenants-namespace` ApplicationSet** stamps the annotation + short label
   via a conditional `kustomize.patches` JSON6902 patch (empty no-op on non-Rancher clusters). Argo stays
   the owner of the namespace/quota/netpol; Rancher owns only access + the Project assignment (no
-  double-managed quotas). See `ArgoCDPlatform/docs/rancher-access-strategy.md` §5 and the Terraform
-  under `platform-terraform/` (`tools/rancher-cluster` + `modules/rancher-register` + the sbx stack).
-  Still to validate end-to-end once Rancher GitHub auth + `rancher_tenants` are configured.
+  double-managed quotas). See `platform-terraform/docs/rancher.md` and the Terraform under
+  `platform-terraform/` (`tools/rancher-cluster` + `modules/rancher-register` + the sbx stack).
+  Still to validate end-to-end once Rancher GitHub auth + `tenants` (group principals) are configured.
 - **Argo CD GitOps RBAC is placeholder.** The AppProject `roles` / `groups`, the tenant `developer`
   policy, and `argocd-rbac-cm` (`policy.default: role:readonly`) use example `krupakar-hyland:<team>`
   groups; wire them to real IdP groups before relying on them.
