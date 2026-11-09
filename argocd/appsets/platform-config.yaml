@@ -1,0 +1,81 @@
+# Platform cluster-wide CONFIG as ONE versioned chart (Istio Gateway + tenant SecretStore guard + any
+# future platform config), pinned PER CLUSTER in envs/<env>/<cloud>/<region>/versions.yaml
+# (`platformConfig`) and promoted sbx -> dev -> stg -> prd exactly like add-ons — NOT applied from HEAD
+# to every cluster at once. One Application per cluster.
+#
+# Generators: clusters x per-CLUSTER versions file (matrix passes the cluster's env/cloud/region labels
+# into the templated git-files path). The chart version is read from that file as `platformConfig`.
+# pathParamPrefix avoids `.path` collisions with the `$values` ref source.
+#
+# Per-env value overlays live in config/{base,envs/<env>,envs/<env>/<cloud>,envs/<env>/<cloud>/<region>}/values.yaml (e.g. sbx runs the
+# SecretStore guard in Warn mode to soak before Deny in higher envs). New platform config is added to
+# the chart (new template + chart version bump), then promoted here by bumping `platformConfig`.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform-config
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  workloads: "true"
+          - git:
+              repoURL: https://github.com/imkrupakar/platform-gitops
+              revision: main
+              pathParamPrefix: ver
+              files:
+                - path: "envs/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/{{.metadata.labels.region}}/versions.yaml"
+  template:
+    metadata:
+      name: "platform-config-{{.metadata.labels.environment}}-{{.metadata.labels.region}}"
+      annotations:
+        argocd.argoproj.io/sync-wave: "-3"
+      labels:
+        environment: "{{.metadata.labels.environment}}"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: platform-addons
+      sources:
+        - repoURL: ghcr.io/imkrupakar/charts # platform-config OCI chart registry
+          chart: platform-config
+          targetRevision: "{{.platformConfig}}" # pinned per cluster in versions.yaml
+          helm:
+            releaseName: platform-config
+            valueFiles:
+              - $values/config/base/values.yaml
+              - $values/config/envs/{{.metadata.labels.environment}}/values.yaml
+              - $values/config/envs/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/values.yaml
+              - $values/config/envs/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/{{.metadata.labels.region}}/values.yaml
+            ignoreMissingValueFiles: true
+        - repoURL: https://github.com/imkrupakar/platform-gitops
+          targetRevision: main
+          ref: values
+      destination:
+        server: "{{.server}}"
+        # The platform-config chart sets metadata.namespace on EVERY namespaced resource (and
+        # cluster-scoped resources carry none), so this is only the Helm release namespace, never a
+        # placement fallback. It is a dedicated, chart-owned home — NOT ingress — so new platform
+        # config has an honest default. A CI guard rejects any namespaced resource missing its own
+        # metadata.namespace.
+        namespace: platform-system
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 10
+          backoff:
+            duration: 15s
+            factor: 2
+            maxDuration: 5m
+        syncOptions:
+          - ServerSideApply=true
+          - SkipDryRunOnMissingResource=true
+          - CreateNamespace=true

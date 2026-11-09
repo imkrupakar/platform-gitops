@@ -1,0 +1,70 @@
+# Per-tenant NAMESPACE on THIS cluster.
+# For each tenants/<team>/ folder, deploy tenants/<team>/namespace/: the tenant's Namespace and its
+# cloud-agnostic isolation primitives (ResourceQuota, LimitRange, NetworkPolicy). Platform-owned.
+#
+# NOTE: the per-tenant ESO SecretStore is NO LONGER created here. Teams own their own vault and
+# author their SecretStore (and other namespaced config) in their gitops repo under
+# config/envs/<env>/<cloud>/<region>/, applied by the team's own <team>-config ApplicationSet
+# co-located in tenants/<team>/controlplane/config-appset.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tenants-namespace
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  workloads: "true"
+          - git:
+              repoURL: https://github.com/imkrupakar/platform-gitops
+              revision: main
+              directories:
+                - path: tenants/*
+                - path: tenants/_template
+                  exclude: true
+  # Deleting this ApplicationSet, or one of its Applications (tenant folder removed or renamed),
+  # must NEVER cascade into deleting a tenant namespace and everything in it. Offboarding a tenant
+  # therefore needs a manual `kubectl delete namespace <team>` after its folder is removed.
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  template:
+    metadata:
+      name: "tenant-{{.path.basename}}-namespace"
+      annotations:
+        argocd.argoproj.io/sync-wave: "-1"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      # Platform-owned project: tenants cannot create ns/quota/netpol themselves.
+      project: platform-tenants
+      sources:
+        - repoURL: https://github.com/imkrupakar/platform-gitops
+          targetRevision: main
+          path: "tenants/{{.path.basename}}/namespace"
+          # Map this namespace to its 1:1 Rancher Project. The in-cluster cluster Secret carries
+          # `rancher.platform.internal/project-<team> = "<clusterId>:<projectId>"` (written by Terraform
+          # from the rancher-register module). When present we stamp the field.cattle.io/projectId
+          # annotation (full id) + the short label Rancher adds itself (so Argo selfHeal does not
+          # flap); otherwise the JSON6902 patch is an empty no-op, so non-Rancher / not-yet-registered
+          # clusters render unchanged. Needs Argo CD >= 2.5 (source.kustomize.patches).
+          kustomize:
+            patches:
+              - target:
+                  kind: Namespace
+                patch: '{{- $pid := dig "metadata" "annotations" (printf "rancher.platform.internal/project-%s" .path.basename) "" (. | toJson | fromJson) -}}{{- if $pid -}}[{"op":"add","path":"/metadata/annotations/field.cattle.io~1projectId","value":{{ $pid | quote }}},{"op":"add","path":"/metadata/labels/field.cattle.io~1projectId","value":{{ $pid | splitList ":" | last | quote }}}]{{- else -}}[]{{- end -}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{.path.basename}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

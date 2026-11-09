@@ -1,0 +1,28 @@
+# Platform-owned project used ONLY by the tenants-namespace ApplicationSet to create the
+# per-tenant namespace, ResourceQuota, LimitRange, and NetworkPolicy on
+# the local cluster. Tenants have no access to this project, which is why their own
+# AppProjects can safely blacklist these resource kinds.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-tenants
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Platform-managed tenant isolation primitives
+  sourceRepos:
+    - https://github.com/imkrupakar/platform-gitops
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "team-*"
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+    - group: networking.k8s.io
+      kind: NetworkPolicy

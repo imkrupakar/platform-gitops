@@ -1,0 +1,28 @@
+# Starter quota — tune per tenant before merging.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: TEAM_NAME-quota
+  namespace: TEAM_NAME
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    pods: "30"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: TEAM_NAME-limits
+  namespace: TEAM_NAME
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi

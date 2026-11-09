@@ -1,0 +1,29 @@
+# Applies all platform ApplicationSets (add-ons + tenant fan-out) on THIS cluster.
+# They generate the Applications that deploy ESO/cert-manager/ingress/rollouts and each
+# tenant's AppProject, namespace, quota, NetworkPolicy, ESO store, and workloads — all
+# to the local cluster. The cluster's environment is read from the labeled in-cluster
+# secret created by the cluster-provisioning Terraform.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-appsets
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/imkrupakar/platform-gitops
+    targetRevision: main
+    path: argocd/appsets
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

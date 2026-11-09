@@ -1,0 +1,6 @@
+# Platform Engineering owns this repo. Every change here is pulled by EVERY cluster, so review it as such.
+* @imkrupakar/platform-engineering
+# Per-cluster pins for production, and the shared ApplicationSets, need the leads as well.
+/envs/prd/ @imkrupakar/platform-engineering-leads
+/appsets/ @imkrupakar/platform-engineering-leads
+/tenants/_template/ @imkrupakar/platform-engineering-leads

@@ -1,0 +1,32 @@
+# PR check for platform-gitops. Every cluster pulls `main` of this repo, so a bad merge reaches
+# every environment at once: gate it. Runs the consistency validator and schema-checks the manifests.
+name: validate
+on:
+  pull_request:
+permissions:
+  contents: read
+env:
+  # pinned by digest, like the other scanners; bump the tag and digest together
+  KUBECONFORM: ghcr.io/yannh/kubeconform:v0.8.0@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e
+jobs:
+  platform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out fleet.yaml (the list of clusters)
+        uses: actions/checkout@v4
+        with:
+          repository: imkrupakar/platform-terraform
+          path: tf
+          token: ${{ secrets.PLATFORM_READ_TOKEN || github.token }} # needed when that repo is private
+      - name: Platform consistency (fleet, versions, tenants, template drift, chart source)
+        run: python3 tools/validate_platform.py --fleet tf/fleet.yaml
+      - name: Manifest schemas (kubeconform)
+        # config/, addons/ and envs/ hold Helm values / version pins (not Kubernetes manifests),
+        # so they are intentionally excluded — they have no kind/schema to validate.
+        run: |
+          docker run --rm -v "$PWD:/work:ro" -w /work "$KUBECONFORM" \
+            -summary -ignore-missing-schemas -skip Kustomization \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            tenants argocd

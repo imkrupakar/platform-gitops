@@ -1,0 +1,38 @@
+# Copy this folder to tenants/<team> to onboard a new tenant, then replace TEAM_NAME.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: TEAM_NAME
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Tenant boundary for TEAM_NAME
+  sourceRepos:
+    - https://github.com/imkrupakar/TEAM_NAME-gitops
+    - ghcr.io/imkrupakar/charts # golden-service OCI chart registry
+    - https://github.com/imkrupakar/golden-helm-charts # sandbox: chart via git path
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: TEAM_NAME
+  sourceNamespaces:
+    - TEAM_NAME
+  # Empty: tenants create NO cluster-scoped resources (forbids ClusterSecretStore/ClusterExternalSecret
+  # — only the platform may create those for shared secrets). Namespaced SecretStore/ExternalSecret
+  # ARE allowed: teams author their own SecretStore in <team>-gitops/config/envs/<env>/<cloud>/<region>/.
+  clusterResourceWhitelist: []
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+  roles:
+    - name: developer
+      description: sync + read for TEAM_NAME apps
+      policies:
+        - p, proj:TEAM_NAME:developer, applications, get,  TEAM_NAME/TEAM_NAME/*, allow
+        - p, proj:TEAM_NAME:developer, applications, sync, TEAM_NAME/TEAM_NAME/*, allow
+      groups:
+        - imkrupakar:TEAM_NAME

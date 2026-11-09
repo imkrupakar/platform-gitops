@@ -1,0 +1,73 @@
+# Co-located with appset.yaml (workloads). Copy this folder and replace team-alpha to onboard a team.
+#
+# Per-CLUSTER, team-owned NAMESPACED CONFIG (the ESO SecretStore today; later ServiceAccounts, Istio
+# AuthorizationPolicy/PeerAuthentication, extra NetworkPolicy, ConfigMaps, ...), sourced from the
+# team's OWN gitops repo at config/envs/<env>/<cloud>/<region>/ (same envs/<env>/<cloud>/<region>
+# order the team's apps use). Installed into argocd by the tenant-<team>-cp Application, exactly like
+# the workloads appset next to it -- so there is NO separate top-level platform appset.
+#
+# Cardinality: ONE Application per CLUSTER (not per service). A SecretStore is a per-namespace
+# singleton, so it cannot ride on the per-service workloads appset (every service Application would
+# fight to own the one store). Generators: clusters x git-DIRECTORIES:
+#   - the git-directories generator matches config/envs/<env>/<cloud>/<region> for THIS cluster
+#     (path templated from the cluster's labels), so a cluster without a config folder renders
+#     nothing (gated, like a missing workload leaf);
+#   - directories (not files) is deliberate: a git-files generator would read the raw manifest's
+#     top-level `metadata` key and clobber the cluster generator's `.metadata.labels`.
+# The team authors the manifests; the platform only declares this wiring. Teams cannot create
+# cluster-scoped resources (the team AppProject keeps clusterResourceWhitelist []), so no
+# ClusterSecretStore -- only namespaced SecretStore/ExternalSecret.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: team-alpha-config
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  workloads: "true"
+          - git:
+              repoURL: https://github.com/imkrupakar/team-alpha-gitops
+              revision: main
+              directories:
+                - path: "config/envs/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/{{.metadata.labels.region}}"
+  template:
+    metadata:
+      name: "team-alpha-config-{{.metadata.labels.environment}}-{{.metadata.labels.region}}"
+      labels:
+        tenant: team-alpha
+        environment: "{{.metadata.labels.environment}}"
+      annotations:
+        argocd.argoproj.io/sync-wave: "-1"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: team-alpha
+      source:
+        repoURL: https://github.com/imkrupakar/team-alpha-gitops
+        targetRevision: main
+        path: "{{.path.path}}"
+        directory:
+          recurse: true
+      destination:
+        server: "{{.server}}"
+        namespace: team-alpha
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: -1 # unlimited: the namespace (tenants-namespace) may not exist yet on a fresh cluster, and a failed auto-sync is not retried on the same commit
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=false
+          - ServerSideApply=true

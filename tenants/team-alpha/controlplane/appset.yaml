@@ -1,0 +1,89 @@
+# Workload generator for team-alpha (generated from tenants/_template/controlplane/appset.yaml).
+# Generators: cluster generator x team service LEAVES.
+# The golden chart VERSION is team-owned: team-alpha sets `goldenChart` in its own cluster
+# LEAF file (apps/<svc>/envs/<env>/<cloud>/<region>/values.yaml), at the team's own pace.
+# Add-on versions (ESO, cert-manager, ...) are unrelated to this appset — they're read from
+# envs/<env>/<cloud>/<region>/versions.yaml by the separate platform-addons appset.
+#
+# A service is deployed to a cluster only when its CLUSTER LEAF exists in the team repo:
+#   apps/<svc>/envs/<env>/<cloud>/<region>/values.yaml     (holds the image pin; written by CI / promote)
+# so a new region renders nothing until a promotion PR opts each service in, and prd regions
+# are promoted one at a time. NB: the leaf's content is also exposed as generator params, so do
+# not use the top-level keys name/server/metadata/environment/cloud/region/addons in it.
+# A leaf without `goldenChart` (or with an empty one) gets the deliberately invalid revision
+# MISSING-goldenChart-in-leaf: only that Application errors, the rest of the AppSet is unaffected.
+# The PR check (tools/check_team_layout.py) rejects such a leaf before it can merge.
+#
+# Values layers (later wins; every layer optional except base): base -> env -> env/cloud -> leaf.
+# The chart also gets global.cloud/region/environment from the cluster's labels.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: team-alpha-workloads
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  workloads: "true"
+          - git:
+              repoURL: https://github.com/imkrupakar/team-alpha-gitops
+              revision: main
+              files:
+                - path: "apps/*/envs/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/{{.metadata.labels.region}}/values.yaml"
+  template:
+    metadata:
+      name: "team-alpha-{{ index .path.segments 1 }}-{{.metadata.labels.environment}}-{{.metadata.labels.region}}"
+      namespace: team-alpha
+      labels:
+        tenant: team-alpha
+        service: "{{ index .path.segments 1 }}"
+        environment: "{{.metadata.labels.environment}}"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: team-alpha
+      sources:
+        - repoURL: ghcr.io/imkrupakar/charts # OCI Helm registry (no scheme); see argocd/repositories/repo-golden-charts.yaml
+          chart: golden-service
+          targetRevision: '{{ if and (hasKey . "goldenChart") .goldenChart }}{{ .goldenChart }}{{ else }}MISSING-goldenChart-in-leaf{{ end }}'
+          helm:
+            releaseName: "{{ index .path.segments 1 }}"
+            # Cluster identity for cloud-aware chart logic (e.g. workload-identity labels).
+            parameters:
+              - name: global.cloud
+                value: "{{.metadata.labels.cloud}}"
+              - name: global.region
+                value: "{{.metadata.labels.region}}"
+              - name: global.environment
+                value: "{{.metadata.labels.environment}}"
+            valueFiles:
+              - $values/apps/{{ index .path.segments 1 }}/base/values.yaml
+              - $values/apps/{{ index .path.segments 1 }}/envs/{{.metadata.labels.environment}}/values.yaml
+              - $values/apps/{{ index .path.segments 1 }}/envs/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/values.yaml
+              - $values/apps/{{ index .path.segments 1 }}/envs/{{.metadata.labels.environment}}/{{.metadata.labels.cloud}}/{{.metadata.labels.region}}/values.yaml
+            ignoreMissingValueFiles: true
+        - repoURL: https://github.com/imkrupakar/team-alpha-gitops
+          targetRevision: main
+          ref: values
+      destination:
+        server: "{{.server}}"
+        namespace: team-alpha
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: -1 # unlimited: the namespace (tenants-namespace) may not exist yet on a fresh cluster, and a failed auto-sync is not retried on the same commit
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=false
+          - ServerSideApply=true

@@ -1,0 +1,42 @@
+# Tenant boundary for team-alpha. Constrains source repos, destinations, allowed
+# resource kinds, and which namespaces may host Application CRs (apps-in-any-namespace).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: team-alpha
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Tenant boundary for team-alpha
+  sourceRepos:
+    - https://github.com/imkrupakar/team-alpha-gitops
+    - ghcr.io/imkrupakar/charts # golden-service OCI chart registry
+    - https://github.com/imkrupakar/golden-helm-charts # sandbox: chart via git path
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: team-alpha
+  # Application CRs for this tenant may live in the team-alpha namespace on this cluster.
+  sourceNamespaces:
+    - team-alpha
+  # Empty: tenants create NO cluster-scoped resources. This is what forbids a team from creating
+  # a cluster-wide ClusterSecretStore/ClusterExternalSecret — only the platform may (shared secrets).
+  clusterResourceWhitelist: []
+  # Tenants cannot create their own isolation/limit primitives (platform owns them). Namespaced
+  # external-secrets.io SecretStore + ExternalSecret ARE allowed: teams own their vault and author
+  # their SecretStore as a config file in their gitops repo (config/envs/<env>/<cloud>/<region>/).
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+  roles:
+    - name: developer
+      description: sync + read for team-alpha apps
+      policies:
+        - p, proj:team-alpha:developer, applications, get,  team-alpha/team-alpha/*, allow
+        - p, proj:team-alpha:developer, applications, sync, team-alpha/team-alpha/*, allow
+      groups:
+        - imkrupakar:team-alpha

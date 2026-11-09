@@ -1,0 +1,32 @@
+# Project for platform add-ons (ESO, Istio, rollouts) + the shared Istio Gateway. Add-ons may
+# install CRDs and cluster-scoped resources, so this project is deliberately broad —
+# but it is reserved for Platform Engineering and the add-ons/platform-config ApplicationSets.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-addons
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Platform add-ons managed by Platform Engineering
+  sourceRepos:
+    - https://github.com/imkrupakar/platform-gitops
+    - ghcr.io/imkrupakar/charts # platform-config OCI chart registry
+    - https://charts.external-secrets.io
+    - https://istio-release.storage.googleapis.com/charts
+    - https://argoproj.github.io/argo-helm
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: external-secrets
+    - server: https://kubernetes.default.svc
+      namespace: istio-system
+    - server: https://kubernetes.default.svc
+      namespace: istio-ingress
+    - server: https://kubernetes.default.svc
+      namespace: argo-rollouts
+    - server: https://kubernetes.default.svc
+      namespace: kube-system
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
