@@ -18,6 +18,8 @@ spec:
     - https://argoproj.github.io/argo-helm
   destinations:
     - server: https://kubernetes.default.svc
+      namespace: platform-system # chart-owned home for the platform-config release
+    - server: https://kubernetes.default.svc
       namespace: external-secrets
     - server: https://kubernetes.default.svc
       namespace: istio-system
